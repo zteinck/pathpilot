@@ -19,23 +19,12 @@ import hashlib
 
 
 
-
 #+---------------------------------------------------------------------------+
 # Freestanding functions
 #+---------------------------------------------------------------------------+
 
 def File(f, **kwargs):
     ''' assigns new file instances to the correct class polymorphism '''
-    extension_mapping = {
-        'xlsx': ExcelFile,
-        'xls': ExcelFile,
-        'csv': CSVFile,
-        'pickle': PickleFile,
-        'py': TextFile,
-        'txt': TextFile,
-        'zip': ZipFile,
-        'sqlite': SQLiteFile,
-        }
     extension = FileBase.trifurcate(f)[-1]
     out = extension_mapping.get(extension, FileBase)(f, **kwargs)
     return out
@@ -48,6 +37,12 @@ def _get_cwd():
     cwd = os.path.dirname(os.path.abspath(__file__)).split('\\')
     cwd[-1] = ''
     return '/'.join(cwd)
+
+
+
+def get_python_path(*args, **kwargs):
+    ''' return python path environmental variable as a Folder object '''
+    return Folder(os.environ['PYTHONPATH'], *args, **kwargs)
 
 
 
@@ -2239,6 +2234,22 @@ class ExcelFile(FileBase):
         return formats
 
 
+
+#+---------------------------------------------------------------------------+
+# Variables
+#+---------------------------------------------------------------------------+
+
+# file extension to object mapping dictionary
+extension_mapping = {
+    'xlsx': ExcelFile,
+    'xls': ExcelFile,
+    'csv': CSVFile,
+    'pickle': PickleFile,
+    'py': TextFile,
+    'txt': TextFile,
+    'zip': ZipFile,
+    'sqlite': SQLiteFile,
+    }
 
 
 
