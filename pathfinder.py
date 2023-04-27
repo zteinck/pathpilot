@@ -438,7 +438,7 @@ class FileBase(object):
     def rename(self, name):
         ''' Renames file. You can essentially use this as a cut and paste if you specify the new directory.
         You can also change the file extention if you wish '''
-        os.rename(self.path, name.file)
+        os.rename(self.path, name.path)
 
     def cut(self, name, **kwargs):
         ''' cut and paste the file to a new location '''
@@ -447,7 +447,7 @@ class FileBase(object):
     @Decorators.move_file
     def copy(self, name, **kwargs):
         ''' copy the file to a new location '''
-        shutil.copyfile(self.path, name.file)
+        shutil.copyfile(self.path, name.path)
 
     def require(self, name):
         ''' special case of self.copy where file is copied to destination ONLY if it does not already exist '''
@@ -458,7 +458,7 @@ class FileBase(object):
         f = self.trifurcate_and_fill(name or self.path)
         if f.ext != 'zip': f = File(f'{f.folder}{f.name}.zip')
         if not self.exists: raise Exception(f"'{self}' cannot be zipped because it does not exist")
-        zipfile.ZipFile(f.file, 'w', zipfile.ZIP_DEFLATED).write(self.path, arcname=self.fullname)
+        zipfile.ZipFile(f.path, 'w', zipfile.ZIP_DEFLATED).write(self.path, arcname=self.fullname)
         if delete_original: self.delete()
         return f
 
@@ -609,14 +609,14 @@ class ZipFile(FileBase):
 
         Parameters
         ----------
-        payload : str | list | tuple | py_utilities.os_.File | py_utilities.os_.Folder
+        payload : str | list | tuple | File | Folder
             str representing a single file or folder or \
             list or tuple comprised of str, File, or Folder
             representing files and folders to be zipped
         delete_original : bool
             If True, zipped files/folders are deleted after being zipped
         filter_func : callable
-            function applied to every file in the folder (argument will be of type py_utilities.File).
+            function applied to every file in the folder (argument will be of type File).
             If filter_func returns True for a given file it will be included in the zip process
             otherwise excluded (e.g. filters out files that are not of file extention .py
             lambda x: x.ext == 'py').
@@ -702,7 +702,7 @@ class ZipFile(FileBase):
                 if not include_folders: p = p[1:]
                 arcname = '/'.join(p + [f.nameext])
 
-            zip_obj.write(f.file, arcname=arcname)
+            zip_obj.write(f.path, arcname=arcname)
             if delete_original: f.delete()
             if verbose: print(f'\t• {arcname}')
             return True
