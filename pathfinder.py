@@ -1990,7 +1990,7 @@ class ExcelFile(FileBase):
                 total_row_format = []
                 for k in df.columns:
                     fmt = ['bold','top']
-                    if k == total_column_name: fmt.append('left')
+                    if total_column and k == total_column_name: fmt.append('left')
                     if k in data_format: fmt.append(data_format[k])
                     total_row_format.append(fmt)
 
