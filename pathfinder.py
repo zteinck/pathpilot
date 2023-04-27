@@ -1589,7 +1589,8 @@ class ExcelFile(FileBase):
     def save(self, args=None, sheets=None, **kwargs):
 
         if args is not None:
-            for i, arg in enumerate(to_iter(args)):
+            if not isinstance(args, (list, tuple)): args = [args]
+            for i, arg in enumerate(args):
                 self.write_df(
                     df=arg,
                     sheet=sheets[i] if sheets else f'Sheet{i + 1}',
