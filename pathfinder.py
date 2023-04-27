@@ -1692,13 +1692,8 @@ class ExcelFile(FileBase):
                 if row == n_rows - 1: updates['bottom'] = 1
                 fmt.update(updates)
 
-            if fmt:
-                sha256 = hashlib.sha256()
-                sha256.update(bytes(str(sorted(list(fmt.items()))), encoding='utf-8'))
-                key = sha256.hexdigest()
-                if key not in self.format_cache:
-                    self.format_cache[key] = self.workbook.add_format(fmt)
-                return self.format_cache[key]
+            return self.get_format(fmt)
+
 
 
         if sheet is not None:
@@ -2166,6 +2161,33 @@ class ExcelFile(FileBase):
 
         self.formats[name] = fmt
         return name
+
+
+
+    def get_format(self, fmt):
+        '''
+        Description
+        ------------
+        Takes a dictionary representing format parameters and returns the corresponding format object.
+        The format will be added to the workbook and cached if it does not already exist.
+
+        Parameters
+        ------------
+        fmt : dict | None
+            see https://xlsxwriter.readthedocs.io/format.html
+
+        Returns
+        ------------
+        out : xlsxwriter.format.Format | None
+            format object
+        '''
+        if not fmt: return
+        sha256 = hashlib.sha256()
+        sha256.update(bytes(str(sorted(list(fmt.items()))), encoding='utf-8'))
+        key = sha256.hexdigest()
+        if key not in self.format_cache:
+            self.format_cache[key] = self.workbook.add_format(fmt)
+        return self.format_cache[key]
 
 
 
