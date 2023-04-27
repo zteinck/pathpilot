@@ -2039,7 +2039,7 @@ class ExcelFile(FileBase):
 
 
 
-    def fill_formula(self, start_cell, formula, limit, headers=None, formatting=None, down=True):
+    def fill_formula(self, start_cell, formula, limit, headers=None, formatting=None, down=True, outer_border=False):
         '''
         Description
         ------------
@@ -2063,9 +2063,11 @@ class ExcelFile(FileBase):
             List of column header names. Required argument when placeholders are used in formula or
             start_cell.
         formatting : str
-            ExcelFile.write() argument.
+            see ExcelFile.write() argument of the same name.
         down : bool
             If True, formula is filled down otherwise it is filled right.
+        outer_border : bool
+            see ExcelFile.write() argument of the same name.
 
         Returns
         ------------
@@ -2107,7 +2109,8 @@ class ExcelFile(FileBase):
             start_cell=start_cell,
             data=data,
             formatting=formatting,
-            inverse=down
+            inverse=down,
+            outer_border=outer_border
             )
 
 
