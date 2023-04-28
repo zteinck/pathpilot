@@ -2167,29 +2167,39 @@ class ExcelFile(FileBase):
 
 
 
-    def get_format(self, fmt):
+    def get_format(self, arg):
         '''
         Description
         ------------
-        Takes a dictionary representing format parameters and returns the corresponding format object.
+        Takes an argument and returns the corresponding format object.
         The format will be added to the workbook and cached if it does not already exist.
 
         Parameters
         ------------
-        fmt : dict | None
-            see https://xlsxwriter.readthedocs.io/format.html
+        arg : str | tuple | list | dict | None
+            • str | tuple | list -> passed to add_format as 'name' argument.
+            • dict -> Format parameters. The resulting format will not be available in self.formats
+                      but it will still be cached and can be accessed by passing the same dictionary
+                      to this function.
+            • None -> None is returned
 
         Returns
         ------------
         out : xlsxwriter.format.Format | None
             format object
         '''
-        if not fmt: return
+        if not arg: return
+
+        if not isinstance(arg, dict):
+            name = self.add_format(name=arg)
+            arg = self.formats[name]
+
         sha256 = hashlib.sha256()
-        sha256.update(bytes(str(sorted(list(fmt.items()))), encoding='utf-8'))
+        sha256.update(bytes(str(sorted(list(arg.items()))), encoding='utf-8'))
         key = sha256.hexdigest()
         if key not in self.format_cache:
-            self.format_cache[key] = self.workbook.add_format(fmt)
+            self.format_cache[key] = self.workbook.add_format(arg)
+
         return self.format_cache[key]
 
 
