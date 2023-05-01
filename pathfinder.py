@@ -121,6 +121,44 @@ def backup_folder(origin, destination, overwrite=True, shallow=True, verbose=Tru
 
 
 
+def purge_whitespace(func):
+    ''' wrapper function that purges unwanted whitespace from a DataFrame '''
+
+    def wrapper(*args, **kwargs):
+
+        def strip_or_skip(x):
+            try:
+                return x.strip()
+            except:
+                return x
+
+        df = func(*args, **kwargs)
+
+        # clean column names by trimming leading/trailing whitespace and removing new lines and consecutive spaces
+        df.rename(columns={k: ' '.join(k.split()) for k in df.columns if isinstance(k, str)}, inplace=True)
+
+        # replace None with np.nan
+        for k in df.columns:
+            try:
+                df[k] = df[k].fillna(np.nan)
+            except:
+                pass
+
+        # trim leading/trailing whitespace and replace whitespace-only values with NaN
+        for k in df.select_dtypes(include=['object']).columns:
+            df[k] = df[k].replace(to_replace=r'^\s*$', value=np.nan, regex=True)
+
+            # using the vectorized string method str.strip() is faster but object-type columns can have mixed data types
+            df[k] = df[k].apply(strip_or_skip) #.str.strip()
+
+        # df.replace(r'^\s*$', np.nan, regex=True, inplace=True)
+
+        return df
+
+    return wrapper
+
+
+
 #+---------------------------------------------------------------------------+
 # Classes
 #+---------------------------------------------------------------------------+
@@ -529,6 +567,7 @@ class CSVFile(FileBase):
     def __init__(self, f):
         super().__init__(f)
 
+    @purge_whitespace
     def read(self, **kwargs):
         df = pd.read_csv(
             self.path,
@@ -1576,6 +1615,7 @@ class ExcelFile(FileBase):
     # Instance Methods
     #+---------------------------------------------------------------------------+
 
+    @purge_whitespace
     def read(self, **kwargs):
         df = pd.read_excel(
             io=self.path,
