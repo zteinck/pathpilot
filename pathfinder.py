@@ -1629,8 +1629,7 @@ class ExcelFile(FileBase):
     def save(self, args=None, sheets=None, **kwargs):
 
         if args is not None:
-            if not isinstance(args, (list, tuple)): args = [args]
-            for i, arg in enumerate(args):
+            for i, arg in enumerate(to_iter(args)):
                 self.write_df(
                     df=arg,
                     sheet=sheets[i] if sheets else f'Sheet{i + 1}',
@@ -1963,9 +1962,10 @@ class ExcelFile(FileBase):
             if total_column_format is None: total_column_format = 'auto'
 
             for k in numeric_columns:
-                s = df[k].dropna().abs()
-                if s.max() >= 1000:
-                    data_format[k] = 'commas' if s.sum() - s.round().sum() == 0 else 'commas_two_decimals'
+                if not df[k].isna().all():
+                    s = df[k].dropna().abs()
+                    if s.max() >= 1000:
+                        data_format[k] = 'commas' if s.sum() - s.round().sum() == 0 else 'commas_two_decimals'
 
             for k in percent_columns: data_format[k] = 'percent_two_decimals'
             for k in datetime_columns: data_format[k] = 'datetime'
