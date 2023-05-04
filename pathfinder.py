@@ -257,46 +257,6 @@ class FileBase(object):
         name, ext = FileBase.split(f[-1])
         return folder, name, ext.lower()
 
-    @staticmethod
-    def get_file_size(x, unit='infer', scale=4, as_str=True):
-        '''
-        Description
-        ----------
-        Returns size of a file
-
-        Parameters
-        ----------
-        x : str | object
-            Folder (str) or object
-        unit : str
-            Unit of measurement (e.g. KB, MB, etc.)
-        scale : int
-            Number of digits to round size to
-        as_str : bool
-            If True, returns size as string with unit appended
-
-        Returns
-        ----------
-        out : float | str
-            file size in bytes
-        '''
-        conversion_factors = OrderedDict([
-            ('TB', 10**-12),
-            ('GB', 10**-9),
-            ('MB', 10**-6),
-            ('KB', 10**-3),
-            ('B', 1)
-            ])
-
-        size = os.stat(x).st_size
-        if unit == 'infer':
-            for unit, factor in conversion_factors.items():
-                if size * factor >= 1: break
-
-        size *= conversion_factors[unit]
-        if scale is not None: size = round(size, scale)
-        return '{0} {1}'.format(size, unit) if as_str else size
-
 
 
     #+---------------------------------------------------------------------------+
@@ -434,6 +394,11 @@ class FileBase(object):
     def size(self):
         ''' the current size of the file expressed in bytes '''
         return os.stat(self.path).st_size if self.exists else None
+
+    @property
+    def size_label(self):
+        ''' the current size of the file expressed in bytes '''
+        return get_size_label(self.size) if self.exists else None
 
     @property
     def created_date(self):
