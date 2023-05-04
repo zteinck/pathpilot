@@ -16,6 +16,8 @@ import sqlite3
 import datetime
 import time
 import hashlib
+import math
+import sys
 
 
 
@@ -43,6 +45,21 @@ def _get_cwd():
 def get_python_path(*args, **kwargs):
     ''' return python path environmental variable as a Folder object '''
     return Folder(os.environ['PYTHONPATH'], *args, **kwargs)
+
+
+
+def get_size_label(size_in_bytes, decimal_places=2):
+
+    units = ('','K','M','G','T','P','E','Z','Y')
+    conversion_factor = 1024
+
+    if size_in_bytes == 0:
+        index, size = 0, 0
+    else:
+        index = int(math.floor(math.log(size_in_bytes, conversion_factor)))
+        size = size_in_bytes / math.pow(conversion_factor, index)
+
+    return f'{size:,.{decimal_places}f} {units[index]}B'
 
 
 
@@ -1758,7 +1775,8 @@ class ExcelFile(FileBase):
             return
 
         if self.verbose:
-             print(f"\twriting to '{self.active_worksheet.name}' tab", end='... ')
+             size_label = get_size_label(sys.getsizeof(data))
+             print(f"\twriting {size_label} to '{self.active_worksheet.name}' tab", end='... ')
 
         if not data:
             if self.verbose: print('SKIPPED')
