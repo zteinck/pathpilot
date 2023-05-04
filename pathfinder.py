@@ -731,7 +731,7 @@ class ZipFile(FileBase):
                     return Folder(x, read_only=True)
                 else:
                     raise TypeError(f"string argument '{x}' is not a file or folder")
-            if isinstance(x, (File, Folder)):
+            if isinstance(x, (FileBase, Folder)):
                 return x
             else:
                 raise TypeError(f"argument '{x}' of type '{type(x)}' is not recognized.")
@@ -766,7 +766,7 @@ class ZipFile(FileBase):
 
         if verbose: print('Zipping:')
         for obj in payload:
-            if isinstance(obj, File):
+            if isinstance(obj, FileBase):
                 zip_file(obj, [obj.folder.name])
             else:
                 folder_can_be_deleted = True
