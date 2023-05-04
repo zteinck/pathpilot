@@ -49,6 +49,11 @@ def get_python_path(*args, **kwargs):
 
 
 
+def get_data_path():
+    return get_python_path().parent.join('Data')
+
+
+
 def get_size_label(size_in_bytes, decimal_places=2):
 
     units = ('','K','M','G','T','P','E','Z','Y')
