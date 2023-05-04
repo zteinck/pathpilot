@@ -36,9 +36,10 @@ def File(f, **kwargs):
 def _get_cwd():
     ''' os.getcwd() alternative since its behavior is inconsistent. In vscode, for example,
         it returns the workspace folder rather than the subfolder '''
-    cwd = os.path.dirname(os.path.abspath(__file__)).split('\\')
-    cwd[-1] = ''
-    return '/'.join(cwd)
+    # cwd = os.path.dirname(os.path.abspath(__file__)).split('\\')
+    # cwd[-1] = ''
+    # return '/'.join(cwd)
+    return get_python_path().path
 
 
 
@@ -665,14 +666,14 @@ class ZipFile(FileBase):
 
         Parameters
         ----------
-        payload : str | list | tuple | File | Folder
+        payload : str | list | tuple | FileBase | Folder
             str representing a single file or folder or \
-            list or tuple comprised of str, File, or Folder
+            list or tuple comprised of str, FileBase, or Folder
             representing files and folders to be zipped
         delete_original : bool
             If True, zipped files/folders are deleted after being zipped
         filter_func : callable
-            function applied to every file in the folder (argument will be of type File).
+            function applied to every file in the folder (argument will be of type FileBase).
             If filter_func returns True for a given file it will be included in the zip process
             otherwise excluded (e.g. filters out files that are not of file extention .py
             lambda x: x.ext == 'py').
