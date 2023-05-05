@@ -466,9 +466,10 @@ class FileBase(object):
         You can also change the file extention if you wish '''
         os.rename(self.path, name.path)
 
+    @Decorators.move_file
     def cut(self, name, **kwargs):
         ''' cut and paste the file to a new location '''
-        return shutil.move(name, **kwargs)
+        return shutil.move(self.path, name.path)
 
     @Decorators.move_file
     def copy(self, name, **kwargs):
