@@ -445,10 +445,10 @@ class FileBase(object):
     #+---------------------------------------------------------------------------+
 
     def read(self, *args, **kwargs):
-        raise NotImplementedError("read function is not supported for files with extension '{self.ext}'")
+        raise NotImplementedError(f"read function is not supported for files with extension '{self.ext}'")
 
     def save(self, *args, **kwargs):
-        raise NotImplementedError("save function is not supported for files with extension '{self.ext}'")
+        raise NotImplementedError(f"save function is not supported for files with extension '{self.ext}'")
 
     def delete(self):
         ''' delete file if it exists '''
