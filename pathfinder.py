@@ -1918,7 +1918,7 @@ class ExcelFile(FileBase):
                     datelike_columns.remove(k)
 
         for k in datelike_columns:
-            if normalize and (df[k] == df[k].dt.normalize()).all():
+            if normalize and (df[k].dropna() == df[k].dropna().dt.normalize()).all():
                 df[k] = df[k].dt.date
                 date_columns.append(k)
             else:
