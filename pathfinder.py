@@ -1625,7 +1625,7 @@ class ExcelFile(FileBase):
                     **kwargs
                     )
 
-        self.writer.save()
+        self.writer.close()
 
 
     def set_active_worksheet(self, key):
