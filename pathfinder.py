@@ -1610,7 +1610,6 @@ class ExcelFile(FileBase):
     def read(self, **kwargs):
         df = pd.read_excel(
             io=self.path,
-            convert_float=False,
             keep_default_na=False,
             **kwargs
             )
