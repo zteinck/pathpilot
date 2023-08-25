@@ -151,9 +151,11 @@ def purge_whitespace(func):
 
         def strip_or_skip(x):
             try:
-                return x.strip()
+                x = x.strip()
+                if x == '': return np.nan
             except:
-                return x
+                pass
+            return x
 
         df = func(*args, **kwargs)
 
@@ -169,7 +171,7 @@ def purge_whitespace(func):
 
         # trim leading/trailing whitespace and replace whitespace-only values with NaN
         for k in df.select_dtypes(include=['object']).columns:
-            df[k] = df[k].replace(to_replace=r'^\s*$', value=np.nan, regex=True)
+            # df[k] = df[k].replace(to_replace=r'^\s*$', value=np.nan, regex=True)
 
             # using the vectorized string method str.strip() is faster but object-type columns can have mixed data types
             df[k] = df[k].apply(strip_or_skip) #.str.strip()
