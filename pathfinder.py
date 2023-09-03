@@ -1,6 +1,5 @@
 from iterkit import natural_sort, iter_get, to_iter, lower_iter
 from clockwork import quarter_end, month_end, day_of_week, year_end, Date
-
 from collections import OrderedDict
 from copy import deepcopy
 import os
@@ -32,7 +31,6 @@ def File(f, **kwargs):
     return out
 
 
-
 def _get_cwd():
     ''' os.getcwd() alternative since its behavior is inconsistent. In vscode, for example,
         it returns the workspace folder rather than the subfolder '''
@@ -42,16 +40,13 @@ def _get_cwd():
     return get_python_path().path
 
 
-
 def get_python_path(*args, **kwargs):
     ''' return python path environmental variable as a Folder object '''
     return Folder(os.environ['PYTHONPATH'], *args, **kwargs)
 
 
-
 def get_data_path():
     return get_python_path().parent.join('Data')
-
 
 
 def get_size_label(size_in_bytes, decimal_places=2):
@@ -66,7 +61,6 @@ def get_size_label(size_in_bytes, decimal_places=2):
         size = size_in_bytes / math.pow(conversion_factor, index)
 
     return f'{size:,.{decimal_places}f} {units[index]}B'
-
 
 
 def backup_folder(origin, destination, overwrite=True, shallow=True, verbose=True):
@@ -143,7 +137,6 @@ def backup_folder(origin, destination, overwrite=True, shallow=True, verbose=Tru
                 if verbose: print(f'BackingUp: {text}')
 
 
-
 def purge_whitespace(func):
     ''' wrapper function that purges unwanted whitespace from a DataFrame '''
 
@@ -209,7 +202,15 @@ class FileBase(object):
         the file extension (does not include the period)
     '''
 
+    #+---------------------------------------------------------------------------+
+    # Class Attributes
+    #+---------------------------------------------------------------------------+
+
     sorter = File
+
+    #+---------------------------------------------------------------------------+
+    # Initialize Instance
+    #+---------------------------------------------------------------------------+
 
     def __init__(self, f):
         '''
@@ -234,10 +235,12 @@ class FileBase(object):
         rest, ext = os.path.splitext(str(x))
         return rest, ext.replace('.','').lower()
 
+
     @staticmethod
     def is_file(f):
         ''' returns True if the argument is a file '''
         return all(FileBase.trifurcate(f)[1:])
+
 
     @staticmethod
     def is_folder(f):
@@ -245,11 +248,13 @@ class FileBase(object):
         f = FileBase.trifurcate(f)
         return f[0] and not any(f[1:])
 
+
     @staticmethod
     def trifurcate_and_join(f):
         ''' split argument into its components (folder inferred if absent) and combine them into one string '''
         folder, name, ext = FileBase.trifurcate(f)
         return folder + name + '.' + ext if name and ext else folder
+
 
     @staticmethod
     def trifurcate(f):
@@ -263,7 +268,6 @@ class FileBase(object):
         folder = f[0] + '/' if len(f) == 2 else _get_cwd()
         name, ext = FileBase.split(f[-1])
         return folder, name, ext.lower()
-
 
 
     #+---------------------------------------------------------------------------+
@@ -315,7 +319,6 @@ class FileBase(object):
             return wrapper
 
 
-
         @staticmethod
         def add_timestamp(func):
             '''
@@ -343,7 +346,6 @@ class FileBase(object):
             return wrapper
 
 
-
     #+---------------------------------------------------------------------------+
     # Class Methods
     #+---------------------------------------------------------------------------+
@@ -362,7 +364,6 @@ class FileBase(object):
         return (cls.sorter or cls)(*args, **kwargs)
 
 
-
     #+---------------------------------------------------------------------------+
     # Properties
     #+---------------------------------------------------------------------------+
@@ -372,51 +373,59 @@ class FileBase(object):
         ''' shorthand self.extension alias '''
         return self.extension
 
+
     @property
     def path(self):
         ''' string representation of the file including the full folder '''
         return self.directory + self.nameext
+
 
     @property
     def nameext(self):
         ''' file name including file extension but exlcuding the folder in string format '''
         return self.name + '.' + self.ext
 
+
     @property
     def fullname(self):
         ''' self.nameext alias '''
         return self.nameext
+
 
     @property
     def exists(self):
         ''' returns True if the file currently exists '''
         return os.path.exists(self.path)
 
+
     @property
     def folder(self):
         ''' returns folder the file is currently in as a Folder object '''
         return Folder(self.directory)
+
 
     @property
     def size(self):
         ''' the current size of the file expressed in bytes '''
         return os.stat(self.path).st_size if self.exists else None
 
+
     @property
     def size_label(self):
         ''' the current size of the file expressed in bytes '''
         return get_size_label(self.size) if self.exists else None
+
 
     @property
     def created_date(self):
         ''' date the file was created '''
         return Date(pd.to_datetime(os.path.getctime(self.path), unit='s'))
 
+
     @property
     def modified_date(self):
         ''' date the file was modified '''
         return Date(pd.to_datetime(os.path.getmtime(self.path), unit='s'))
-
 
 
     #+---------------------------------------------------------------------------+
@@ -426,20 +435,23 @@ class FileBase(object):
     def __repr__(self):
         return self.path.replace('/','\\')
 
+
     def __str__(self):
         return self.path
 
+
     def __bool__(self):
         return self.exists
+
 
     def __eq__(self, other):
         f1, f2 = self.path, str(other)
         return f1 == f2 and filecmp.cmp(f1, f2)
 
+
     def __ne__(self, other):
         f1, f2 = self.path, str(other)
         return f1 != f2 or not filecmp.cmp(f1, f2)
-
 
 
     #+---------------------------------------------------------------------------+
@@ -449,12 +461,15 @@ class FileBase(object):
     def read(self, *args, **kwargs):
         raise NotImplementedError(f"read function is not supported for files with extension '{self.ext}'")
 
+
     def save(self, *args, **kwargs):
         raise NotImplementedError(f"save function is not supported for files with extension '{self.ext}'")
+
 
     def delete(self):
         ''' delete file if it exists '''
         if self.exists: os.remove(self.path)
+
 
     def trifurcate_and_fill(self, f):
         ''' trifurcates file and fills gaps with instance attributes '''
@@ -462,25 +477,30 @@ class FileBase(object):
         f = (folder or self.directory) + (name or self.name) + '.' + (ext or self.ext)
         return self.spawn(f)
 
+
     @Decorators.move_file
     def rename(self, name):
         ''' Renames file. You can essentially use this as a cut and paste if you specify the new directory.
         You can also change the file extention if you wish '''
         os.rename(self.path, name.path)
 
+
     @Decorators.move_file
     def cut(self, name, **kwargs):
         ''' cut and paste the file to a new location '''
         return shutil.move(self.path, name.path)
+
 
     @Decorators.move_file
     def copy(self, name, **kwargs):
         ''' copy the file to a new location '''
         shutil.copyfile(self.path, name.path)
 
+
     def require(self, name):
         ''' special case of self.copy where file is copied to destination ONLY if it does not already exist '''
         return self.copy(name, overwrite=False, raise_on_exist=False, raise_on_overwrite=False)
+
 
     def zip(self, name=None, delete_original=False):
         ''' zips a single file '''
@@ -491,6 +511,7 @@ class FileBase(object):
         if delete_original: self.delete()
         return f
 
+
     def unzip(self, folder=None, delete_original=False):
         ''' unzips file '''
         if self.ext != 'zip': raise Exception(f"file '{self.nameext}' is not a zip file")
@@ -499,6 +520,7 @@ class FileBase(object):
             f.extractall(str(folder))
         f.close()
         if delete_original: self.delete()
+
 
     def swap(self, **kwargs):
         ''' quick way of intitializing a new File with different attribute(s)
@@ -510,14 +532,17 @@ class FileBase(object):
         f = directory + name + '.' + extension.replace('.','')
         return self.spawn(f)
 
+
     def deep_copy(self):
         ''' create a copy of the File object '''
         return self.trifurcate_and_fill(str(self.path))
+
 
     def prefix(self, prefix):
         ''' add prefix to file name '''
         name = f'{prefix} {self.name}'
         return self.swap(name=name)
+
 
     def suffix(self, suffix):
         ''' add suffix to file name '''
@@ -530,20 +555,25 @@ class FileBase(object):
     def quarter(self, delta=0):
         return quarter_end(delta=delta).label
 
+
     def qtr(self, *args, **kwargs):
         return self.quarter(*args, **kwargs)
+
 
     @Decorators.add_timestamp
     def month(self, delta=0):
         return month_end(delta=delta).sqlsvr
 
+
     @Decorators.add_timestamp
     def day(self, weekday, delta=0):
         return day_of_week(weekday=weekday, delta=delta).sqlsvr
 
+
     @Decorators.add_timestamp
     def year(self, delta=0):
         return str(year_end(delta=delta).year)
+
 
     @Decorators.add_timestamp
     def timestamp(self, normalize=False, week_offset=0, fmt=None):
@@ -558,6 +588,7 @@ class CSVFile(FileBase):
     def __init__(self, f):
         super().__init__(f)
 
+
     @purge_whitespace
     def read(self, **kwargs):
         df = pd.read_csv(
@@ -567,6 +598,7 @@ class CSVFile(FileBase):
             **kwargs
             )
         return df
+
 
     def save(self, obj, **kwargs):
         if not hasattr(obj, 'to_csv'):
@@ -580,12 +612,14 @@ class TextFile(FileBase):
     def __init__(self, f):
         super().__init__(f)
 
+
     def read(self, mode='r'):
         encoding = 'utf-8' if mode != 'rb' else None
         with open(self.path, mode=mode, encoding=encoding) as file:
             text = file.read()
         file.close()
         return text
+
 
     def save(self, text, mode='w'):
         encoding = 'utf-8' if mode != 'wb' else None
@@ -600,9 +634,11 @@ class PickleFile(FileBase):
     def __init__(self, f):
         super().__init__(f)
 
+
     def read(self):
         out = pd.read_pickle(self.path)
         return out[0] if isinstance(out, tuple) and len(out) == 1 else out
+
 
     def save(self, args):
         if len(args) == 1 and hasattr(args[0], 'to_pickle'):
@@ -622,9 +658,17 @@ class ZipFile(FileBase):
     supports zipping multiple files and folders.
     '''
 
+    #+---------------------------------------------------------------------------+
+    # Initialize Instance
+    #+---------------------------------------------------------------------------+
+
     def __init__(self, f):
         super().__init__(f)
 
+
+    #+---------------------------------------------------------------------------+
+    # Instance Attributes
+    #+---------------------------------------------------------------------------+
 
     def save(self, *args, **kwargs):
         self.zip(*args, **kwargs)
@@ -695,6 +739,7 @@ class ZipFile(FileBase):
                     raise ValueError(f"argument '{x}' cannot be zipped because it does not exist")
                 return x
             return wrapper
+
 
         @verify_exists
         def infer_type(x):
@@ -772,6 +817,7 @@ class SQLiteFile(FileBase):
             )
         return sql
 
+
     @staticmethod
     def update_query(tbl_name, update_cols, where_cols, where_logic=''):
         sql = 'UPDATE {0} SET {1} WHERE {2} {3}'.format(
@@ -782,6 +828,7 @@ class SQLiteFile(FileBase):
             )
         return sql
 
+
     @staticmethod
     def select_query(tbl_name, select_cols, where_cols, where_logic=''):
         sql = 'SELECT {1} FROM {0} WHERE {2} {3}'.format(
@@ -791,6 +838,7 @@ class SQLiteFile(FileBase):
             where_logic
             )
         return sql
+
 
     @staticmethod
     def delete_query(tbl_name, where_cols, where_logic=''):
@@ -810,10 +858,12 @@ class SQLiteFile(FileBase):
         if self.exists: os.remove(self.path)
         if reconnect: self.connect()
 
+
     def connect(self):
         ''' connect to the database '''
         self.conn = sqlite3.connect(self.path, check_same_thread=False)
         self.c = self.conn.cursor()
+
 
     def disconnect(self):
         ''' disconnect from the database '''
@@ -821,46 +871,58 @@ class SQLiteFile(FileBase):
         del self.conn
         del self.c
 
+
     def enable_foreign_keys(self):
         self.c.execute('PRAGMA foreign_keys = ON;')
         self.conn.commit()
+
 
     def tables(self):
         self.c.execute("SELECT name FROM sqlite_master WHERE type='table'")
         return list(x[0] for x in self.c.fetchall())
 
+
     def columns(self, tbl_name):
         return self.table_info(tbl_name).name.tolist()
 
+
     def table_info(self, tbl_name):
         return self.read_sql('PRAGMA table_info(%s)' % tbl_name.split('.')[-1])
+
 
     def data_types(self, tbl_name):
         mapping = {'NULL': None, 'INTEGER': int, 'REAL': float, 'TEXT': str, 'BLOB': object, 'INT': int}
         return {k.lower(): mapping[v] for k,v in self.table_info(tbl_name)[['name','type']].values}
 
+
     def drop(self, tbl_name):
         self.c.execute('DROP TABLE %s' % tbl_name)
         self.conn.commit()
+
 
     def clear(self, tbl_name):
         self.c.execute('DELETE FROM %s' % tbl_name)
         self.conn.commit()
 
+
     def vacuum(self):
         self.c.execute('VACUUM')
         self.conn.commit()
+
 
     def read_sql(self, sql, params=None, **kwargs):
         if len(sql.split()) == 1: sql = "SELECT * FROM %s" % sql
         return pd.read_sql(sql, con=self.conn, params=params)
 
+
     def column_to_set(self, tbl_name, col_name):
         return set(x[0] for x in self.c.execute("SELECT DISTINCT {1} FROM {0}".format(tbl_name,col_name)).fetchall())
+
 
     def execute(self, sql, params=()):
         self.c.execute(sql, params)
         self.conn.commit()
+
 
     def format_payload(self, tbl_name, col_names, payload):
         if isinstance(payload, tuple): payload = [payload]
@@ -869,6 +931,7 @@ class SQLiteFile(FileBase):
                           for col,cell in zip(col_names, row)]) for row in payload]
         return payload
 
+
     def insert(self, tbl_name, payload, col_names=None, clear=False):
         if col_names is None: col_names = self.columns(tbl_name)
         sql = self.insert_query(tbl_name, col_names)
@@ -876,6 +939,7 @@ class SQLiteFile(FileBase):
         if clear: self.clear(tbl_name)
         self.c.executemany(sql,payload)
         self.conn.commit()
+
 
     def df_to_table(self, tbl_name, df, chunksize=0, clear_tbl=False, where_cols=None, where_logic=''):
         ''' performs bulk insert of dataframe; bulk update occurs if where_cols argument is passed '''
@@ -908,6 +972,7 @@ class SQLiteFile(FileBase):
         else:
             to_table(df)
 
+
     def copy_as_temp(self, target_name, temp_name=None, index=None):
         ''' creates temporary table based on permanent table '''
         temp_name = temp_name or target_name
@@ -918,6 +983,7 @@ class SQLiteFile(FileBase):
             sql = 'CREATE INDEX temp.idx ON {0}({1})'.format(temp_name,','.join(to_iter(index)))
             self.c.execute(sql)
             self.conn.commit()
+
 
     def clear_tables(self, warn=True):
         response = input(f'Clear all {self.name}.sqlite tables (y/n)? this action cannot be undone: ') if warn else 'y'
@@ -955,7 +1021,16 @@ class Folder(object):
         if True, prints a notification when new folders are created
     '''
 
+    #+---------------------------------------------------------------------------+
+    # Class Attributes
+    #+---------------------------------------------------------------------------+
+
     file_cls = File
+
+
+    #+---------------------------------------------------------------------------+
+    # Initialize Instance
+    #+---------------------------------------------------------------------------+
 
     def __init__(self, f=None, read_only=True, verbose=False):
         '''
@@ -989,12 +1064,14 @@ class Folder(object):
         if not os.path.exists(f):
             os.mkdir(f)
 
+
     @staticmethod
     def delete_folder(f):
         ''' delete folder if it exists '''
         f = str(f)
         if os.path.exists(f):
             shutil.rmtree(f)
+
 
     @staticmethod
     def get_object_folder(obj):
@@ -1010,6 +1087,7 @@ class Folder(object):
     class ReadOnlyError(Exception):
         def __init__(self, message):
             super().__init__(message)
+
 
     class PickFileError(Exception):
         def __init__(self, message):
@@ -1047,20 +1125,24 @@ class Folder(object):
         ''' True if folder contains no files or folders otherwise False '''
         return True if len(os.listdir(self.path)) == 0 else False
 
+
     @property
     def exists(self):
         ''' True if folder exists '''
         return os.path.exists(self.path)
+
 
     @property
     def hierarchy(self):
         ''' returns list representing tree hierarchy (e.g. 'C:/Python/Projects/' -> ['H:','Python','Projects'] '''
         return list(filter(lambda x: x != '', self.path.split('/')))
 
+
     @property
     def name(self):
         ''' name of folder '''
         return self.hierarchy[-1]
+
 
     @property
     def parent(self):
@@ -1070,20 +1152,24 @@ class Folder(object):
         parent = self.spawn('/'.join(hierarchy[:-1]) + '/', read_only=self.read_only)
         return parent
 
+
     @property
     def parent_name(self):
         ''' name of parent folder '''
         return self.hierarchy[-2]
+
 
     @property
     def files(self):
         ''' list of files in folder '''
         return natural_sort(list(filter(lambda x: x.name[:2] != '~$', list(filter(FileBase.is_file, self)))))
 
+
     @property
     def folders(self):
         ''' list of subfolders in folder '''
         return natural_sort(list(filter(FileBase.is_folder, self)))
+
 
     @property
     def subfolders(self):
@@ -1099,21 +1185,27 @@ class Folder(object):
     def __repr__(self):
         return self.path
 
+
     def __str__(self):
         return self.path
 
+
     def __bool__(self):
         return self.exists
+
 
     def __iter__(self):
         for x in natural_sort(os.listdir(self.path)):
             yield self.join(x)
 
+
     def __add__(self, other):
         return self.join(other)
 
+
     def __getitem__(self, key):
         return self.__dict__.get(self.format_key(key), getattr(self, key))
+
 
     def __getattr__(self, name):
         '''
@@ -1145,9 +1237,11 @@ class Folder(object):
         ''' creates and instance attribute retaining parents' read_only argument '''
         self.__dict__[key] = self.spawn(str(folder), read_only=self.read_only)
 
+
     def format_key(self, key):
         ''' formats attribute key '''
         return key.lower().replace(' ', '_').replace('/', '')
+
 
     def walk(self):
         ''' iterates through every file in the folder and subfolders '''
@@ -1156,10 +1250,12 @@ class Folder(object):
                 file = self.spawn_file(os.path.join(dir_folder, file_name))
                 yield file
 
+
     def iter_all_files(self):
         ''' deprecated alias for walk '''
         for file in self.walk():
             yield file
+
 
     def keys(self, folders_only=True, verbose=False):
         keys = set(self.__dict__.keys())
@@ -1170,6 +1266,7 @@ class Folder(object):
             #params = keys - folders
             #print('Meta Keys:' + '\n\t• '.join([''] + natural_sort(list(params))))
         return folders if folders_only else keys
+
 
     def join(self, *args, **kwargs):
         ''' join one or more subfolders to the folder or join a file '''
@@ -1212,12 +1309,14 @@ class Folder(object):
         if len(folders) == 1:
             return self[key]
 
+
     def rekey(self, remapping):
         ''' swap attribute key '''
         for old_key, new_key in remapping.items():
             old_key, new_key = old_key.lower(), new_key.lower()
             if old_key in self.keys():
                 self.__dict__[new_key] = self.__dict__.pop(old_key)
+
 
     def delete(self, *folders):
         ''' delete one or more folders. if no folders are specified then the instance folder is deleted '''
@@ -1236,6 +1335,7 @@ class Folder(object):
 
         for k in del_keys:
             del self.__dict__[k]
+
 
     def copy(self, folder, overwrite=False):
         ''' copy instance folder to another folder '''
@@ -1356,14 +1456,18 @@ class Folder(object):
     def quarter(self, delta=0, **kwargs):
         return self.join(quarter_end(delta=delta).label, **kwargs)
 
+
     def qtr(self, delta=0, **kwargs):
         return self.quarter(delta=delta, **kwargs)
+
 
     def month(self, delta=0, **kwargs):
         return self.join(month_end(delta=delta).sqlsvr, **kwargs)
 
+
     def day(self, weekday, delta=0, **kwargs):
         return self.join(day_of_week(weekday=weekday, delta=delta).sqlsvr, **kwargs)
+
 
     def year(self, delta=0, **kwargs):
         return self.join(str(year_end(delta=delta).year), **kwargs)
@@ -1420,6 +1524,9 @@ class ExcelFile(FileBase):
 
     '''
 
+    #+---------------------------------------------------------------------------+
+    # Initialize Instance
+    #+---------------------------------------------------------------------------+
 
     def __init__(self, f, number_tabs=False, verbose=True, troubleshoot=False):
         super().__init__(f)
@@ -1429,7 +1536,6 @@ class ExcelFile(FileBase):
         self.page = 0
         self.verbose = verbose
         self.troubleshoot = troubleshoot
-
 
 
     #+---------------------------------------------------------------------------+
@@ -1501,7 +1607,6 @@ class ExcelFile(FileBase):
         return '#%02x%02x%02x' % (red, green, blue)
 
 
-
     #+---------------------------------------------------------------------------+
     # Properties
     #+---------------------------------------------------------------------------+
@@ -1514,7 +1619,6 @@ class ExcelFile(FileBase):
     @property
     def worksheet_names(self):
         return [worksheet.name for worksheet in self]
-
 
 
     #+---------------------------------------------------------------------------+
@@ -1785,7 +1889,6 @@ class ExcelFile(FileBase):
                     )
 
         if self.verbose: print('DONE')
-
 
 
     def write_df(
@@ -2069,7 +2172,6 @@ class ExcelFile(FileBase):
                 )
 
 
-
     def fill_formula(self, start_cell, formula, limit, headers=None, formatting=None, down=True, outer_border=False):
         '''
         Description
@@ -2145,7 +2247,6 @@ class ExcelFile(FileBase):
             )
 
 
-
     def add_format(self, name, fmt=None):
         '''
         Description
@@ -2197,7 +2298,6 @@ class ExcelFile(FileBase):
         return name
 
 
-
     def get_format(self, arg):
         '''
         Description
@@ -2232,7 +2332,6 @@ class ExcelFile(FileBase):
             self.format_cache[key] = self.workbook.add_format(arg)
 
         return self.format_cache[key]
-
 
 
     def _get_preset_formats(self):
