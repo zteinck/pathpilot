@@ -790,11 +790,11 @@ class ZipFile(FileBase):
             else:
                 folder_can_be_deleted = True
                 for f in obj.walk():
-                    zipped = zip_file(f, f.folder[:-1].replace(obj.parent.folder, '').split('/'))
+                    zipped = zip_file(f, f.directory[:-1].replace(obj.parent.path, '').split('/'))
                     if not zipped: folder_can_be_deleted = False
 
                 if delete_original and folder_can_be_deleted:
-                    shutil.rmtree(obj.folder)
+                    shutil.rmtree(obj.path)
 
 
 
