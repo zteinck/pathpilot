@@ -263,7 +263,7 @@ class FileBase(object):
         explicitly_folder = True if f[-1] == '/' else False
         f = '/'.join([x for x in f.split('/') if x])
         f = f + '/' if explicitly_folder or '.' not in f.split('/')[-1] else f
-        if '.com' in f: f = '//' + f
+        if f.split('/')[0][-4:].lower() == '.com': f = '//' + f
         f = f.rsplit('/', 1)
         folder = f[0] + '/' if len(f) == 2 else _get_cwd()
         name, ext = FileBase.split(f[-1])
