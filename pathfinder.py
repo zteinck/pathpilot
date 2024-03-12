@@ -640,13 +640,17 @@ class PickleFile(FileBase):
         return out[0] if isinstance(out, tuple) and len(out) == 1 else out
 
 
-    def save(self, args):
-        if len(args) == 1 and hasattr(args[0], 'to_pickle'):
-            args[0].to_pickle(self.path)
-        else:
-            with open(self.path, 'wb') as file:
-                pickle.dump(args, file)
-            file.close()
+    def save(self, args, **kwargs):
+        if isinstance(args, tuple) and len(args) == 1:
+            args = args[0]
+
+        if hasattr(args, 'to_pickle'):
+            args.to_pickle(self.path, **kwargs)
+            return
+
+        with open(self.path, 'wb') as file:
+            pickle.dump(args, file, **kwargs)
+        file.close()
 
 
 
@@ -1721,6 +1725,11 @@ class ExcelFile(FileBase):
 
 
     def save(self, args=None, sheets=None, **kwargs):
+        
+        if isinstance(args, dict):
+            if sheets is not None: raise ValueError
+            sheets = list(args.keys())
+            args = list(args.values())
 
         if args is not None:
             for i, arg in enumerate(to_iter(args)):
