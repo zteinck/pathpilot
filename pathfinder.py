@@ -1276,6 +1276,9 @@ class Folder(object):
         ''' join one or more subfolders to the folder or join a file '''
         f = FileBase.trifurcate_and_join(self.path + '/'.join(args).replace('/.','.'))
         if FileBase.is_file(f):
+            if not self.read_only:
+                # creates the folder(s) in the file path if they do not already exist
+                self.join(*f.replace(self.path,'').split('/')[:-1])
             return self.spawn_file(f)
         elif FileBase.is_folder(f):
             return self.spawn(f, read_only=kwargs.get('read_only', self.read_only))
