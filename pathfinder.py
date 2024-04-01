@@ -42,7 +42,7 @@ def _get_cwd():
 
 def get_python_path(*args, **kwargs):
     ''' return python path environmental variable as a Folder object '''
-    return Folder(os.environ['PYTHONPATH'], *args, **kwargs)
+    return Folder(os.environ['PYTHONPATH'].split(os.pathsep)[0], *args, **kwargs)
 
 
 def get_data_path():
