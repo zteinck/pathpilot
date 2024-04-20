@@ -2007,6 +2007,11 @@ class ExcelFile(FileBase):
             if not df.columns.tolist(): raise ValueError("'df' argument must have an index or columns")
             total_row, total_column = False, False
 
+        # Check for duplicate column names
+        s = df.columns.value_counts()
+        dupes = s[ s > 1 ].to_frame()
+        if len(dupes) > 0: raise ValueError(f"'df' argument cannot have duplicate column names: \n\n{dupes}\n")
+
         # Add a total column to dataframe
         if total_column:
             total_column_name = 'Total'
