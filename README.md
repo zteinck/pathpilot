@@ -1,17 +1,17 @@
-# pathfinder
-`pathfinder` is a library that facilitates file and folder manipulation in Python. It was designed with an emphasis on `pandas` compatibility to ensure smooth workflows.
+# pathpilot
+`pathpilot` is a library that facilitates file and folder manipulation in Python. It was designed with an emphasis on `pandas` compatibility to ensure smooth workflows.
 
 ### Core Utilities
-`pathfinder` has two core utilities:
+`pathpilot` has two core utilities:
 - `File`: Function that assigns new file instances to the correct child class. Many file types are supported natively including: `.xlsx`, `.csv`, `.txt`, `.pickle`, etc. The mapping of file extensions to their respective classes is managed using the `extension_mapping` global dictionary. Unmapped extensions are assigned to the `FileBase` class.
 - `Folder`: Class for interacting with folders. It is important to be mindful of the `read_only` parameter which, if set to `True`, allows folders to be created or deleted programically.
 
 ## Example Usage
-Please note the examples below represent a small fraction of the functionality offered by `pathfinder`. Please refer to the documentation within the code for more information.
+Please note the examples below represent a small fraction of the functionality offered by `pathpilot`. Please refer to the documentation within the code for more information.
 
 ### Imports
 ```python
-from pathfinder import Folder, File
+from pathpilot import Folder, File
 ```
 
 ### Folders

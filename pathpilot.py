@@ -1,4 +1,4 @@
-from iterkit import natural_sort, iter_get, to_iter, lower_iter
+from iterlab import natural_sort, iter_get, to_iter, lower_iter
 from clockwork import quarter_end, month_end, day_of_week, year_end, Date
 from collections import OrderedDict
 from copy import deepcopy
@@ -1042,7 +1042,7 @@ class Folder(object):
         ----------
         f : str
             if None, folder will be the current working directory which is
-            defined as the parent folder of the folder in which pathfinder.py
+            defined as the parent folder of the folder in which pathpilot.py
             resides. Note that you can get the folder of the project you are
             working in by passing f=__file__
 
