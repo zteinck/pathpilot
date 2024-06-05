@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "pathpilot"
-version = "0.1.0"
+version = "0.1.1"
 description = "Library that facilitates file and folder manipulation in Python."
 authors = ["Zachary Einck <zacharyeinck@gmail.com>"]
 license = "MIT"
@@ -14,6 +14,7 @@ iterlab = "*"
 clockwork = "*"
 pandas = "*"
 numpy = "*"
+XlsxWriter = "*"
 
 [build-system]
 requires = ["poetry-core"]
