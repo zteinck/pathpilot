@@ -1,10 +1,25 @@
 # pathpilot
-`pathpilot` is a library that facilitates file and folder manipulation in Python. It was designed with an emphasis on `pandas` compatibility to ensure smooth workflows.
 
-### Core Utilities
-`pathpilot` has two core utilities:
-- `File`: Function that assigns new file instances to the correct child class. Many file types are supported natively including: `.xlsx`, `.csv`, `.txt`, `.pickle`, etc. The mapping of file extensions to their respective classes is managed using the `extension_mapping` global dictionary. Unmapped extensions are assigned to the `FileBase` class.
-- `Folder`: Class for interacting with folders. It is important to be mindful of the `read_only` parameter which, if set to `True`, allows folders to be created or deleted programically.
+<div>
+
+[![Package version](https://img.shields.io/pypi/v/pathpilot?color=%2334D058&label=pypi)](https://pypi.org/project/pathpilot/)
+[![License](https://img.shields.io/github/license/zteinck/pathpilot)](https://github.com/zteinck/pathpilot/blob/master/LICENSE)
+
+</div>
+
+`pathpilot` is a Python package that makes file and folder manipulation simple and intuitive. It was designed with an emphasis on `pandas` compatibility to ensure smooth workflows.
+
+
+## Installation
+```sh
+pip install pathpilot
+```
+
+
+## Main Features
+- `File` ➔ Function that assigns new file instances to the correct child class. Many file types are supported natively including: *.xlsx*, *.csv*, *.txt*, *.pickle*, etc. The mapping of file extensions to their respective classes is managed using the `extension_mapping` global dictionary. Unmapped extensions are assigned to the `FileBase` class.
+- `Folder` ➔ Class for interacting with folders. It is important to be mindful of the `read_only` parameter which, if set to `True`, allows folders to be created or deleted programically.
+
 
 ## Example Usage
 Please note the examples below represent a small fraction of the functionality offered by `pathpilot`. Please refer to the documentation within the code for more information.
