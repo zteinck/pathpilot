@@ -42,11 +42,13 @@ def _get_cwd():
 
 def get_python_path(*args, **kwargs):
     ''' return python path environmental variable as a Folder object '''
-    return Folder(os.environ['PYTHONPATH'].split(os.pathsep)[0], *args, **kwargs)
+    pypath = os.getenv('PYTHONPATH')
+    f = os.getcwd() if pypath is None else pypath.split(os.pathsep)[0]
+    return Folder(f, *args, **kwargs)
 
 
 def get_data_path():
-    return get_python_path().parent.join('Data')
+    return get_python_path().parent.join('Data', read_only=False)
 
 
 def get_size_label(size_in_bytes, decimal_places=2):
@@ -230,16 +232,21 @@ class FileBase(object):
     #+---------------------------------------------------------------------------+
 
     @staticmethod
-    def split(x):
+    def split_extension(x):
         ''' separates file extention from rest of string '''
-        rest, ext = os.path.splitext(str(x))
-        return rest, ext.replace('.','').lower()
+        dot_index = x.rfind('.')
+        if dot_index == -1: # period not found
+            return x, ''
+        else:
+            ext = x[dot_index + 1:]
+            rest = x[:dot_index]
+            return rest, ext
 
 
     @staticmethod
     def is_file(f):
         ''' returns True if the argument is a file '''
-        return all(FileBase.trifurcate(f)[1:])
+        return bool(FileBase.trifurcate(f)[-1])
 
 
     @staticmethod
@@ -253,20 +260,20 @@ class FileBase(object):
     def trifurcate_and_join(f):
         ''' split argument into its components (folder inferred if absent) and combine them into one string '''
         folder, name, ext = FileBase.trifurcate(f)
-        return folder + name + '.' + ext if name and ext else folder
+        return (folder + name + '.' + ext) if ext else folder
 
 
     @staticmethod
     def trifurcate(f):
         ''' split argument into folder, file name, and file extension components '''
         f = str(f).replace('\\','/')
-        explicitly_folder = True if f[-1] == '/' else False
+        explicitly_folder = f[-1] == '/'
         f = '/'.join([x for x in f.split('/') if x])
         f = f + '/' if explicitly_folder or '.' not in f.split('/')[-1] else f
         if f.split('/')[0][-4:].lower() == '.com': f = '//' + f
         f = f.rsplit('/', 1)
         folder = f[0] + '/' if len(f) == 2 else _get_cwd()
-        name, ext = FileBase.split(f[-1])
+        name, ext = FileBase.split_extension(f[-1])
         return folder, name, ext.lower()
 
 
@@ -464,6 +471,12 @@ class FileBase(object):
 
     def save(self, *args, **kwargs):
         raise NotImplementedError(f"save function is not supported for files with extension '{self.ext}'")
+
+
+    def touch(self):
+        with open(self.path, mode='w') as file:
+            pass
+        file.close()
 
 
     def delete(self):
@@ -1083,6 +1096,38 @@ class Folder(object):
         return os.path.absfolder(inspect.getfile(obj))
 
 
+    @staticmethod
+    def validate_join_args(args):
+        ''' verify all join args are valid '''
+
+        error_template = 'Invalid join argument detected at index %d:'
+        period_rules = 'However, arguments may begin with or contain a single period.'
+        
+        for index, arg in enumerate(args):
+            err_msg = error_template % index
+            
+            if not isinstance(arg, str):
+                raise TypeError(f'{err_msg} Arg is of type {type(arg)}, but all args should be strings.')
+                              
+            if arg == '.':
+                raise ValueError(f"{err_msg} Single period arguments ('.') are not allowed. {period_rules}")
+            
+            if arg.strip() == '':
+                raise ValueError(f"{err_msg} Empty or whitespace-only arguments are not allowed.")
+            
+            if '..' in arg:
+                raise ValueError(f"{err_msg} Consecutive periods are not allowed. {period_rules}")
+
+            if arg[-1] == '.':
+                raise ValueError(f"{err_msg} Arguments may not end in with a period ('.'). {period_rules}")
+            
+            if arg != arg.strip():
+                raise ValueError(f"{err_msg} Argument ('{arg}') contains leading or trailing whitespace.")
+
+            if any(x in arg for x in [':','*','?','"','<','>']):
+                raise ValueError(f"{err_msg} Argument ('{arg}') contains a reserved character.")
+
+
 
     #+---------------------------------------------------------------------------+
     # Classes
@@ -1274,14 +1319,19 @@ class Folder(object):
 
     def join(self, *args, **kwargs):
         ''' join one or more subfolders to the folder or join a file '''
-        f = FileBase.trifurcate_and_join(self.path + '/'.join(args).replace('/.','.'))
+
+        self.validate_join_args(args)
+        f = FileBase.trifurcate_and_join(self.path + '/'.join(args))
+        
         if FileBase.is_file(f):
             if not self.read_only:
                 # creates the folder(s) in the file path if they do not already exist
                 self.join(*f.replace(self.path,'').split('/')[:-1])
             return self.spawn_file(f)
+        
         elif FileBase.is_folder(f):
             return self.spawn(f, read_only=kwargs.get('read_only', self.read_only))
+        
         else:
             raise TypeError(f'Could not infer object. Join result {f} is neither a file or folder.')
 
