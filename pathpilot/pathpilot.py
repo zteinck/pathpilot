@@ -694,7 +694,7 @@ class ZipFile(FileBase):
     def zip(self, payload, delete_original=False, filter_func=None, include_folders=False, files_only=False, verbose=False):
         '''
         Description
-        --------------------
+        -----------
         while FileBase allows you to zip individual files, this polymorphism's self.zip
         supports zipping multiple files and folders.
 
@@ -728,7 +728,7 @@ class ZipFile(FileBase):
         None
 
         Behavior Example:
-        ----------
+        -----------------
             payload = ['C:/Folder A/File 1.txt', 'C:/Folder B/File 2.txt', 'C:/Folder C/']
             'Folder C' contains 'File 3.txt' and a subfolder 'Folder D' with a file called 'File 4.txt'.
 
@@ -1318,7 +1318,67 @@ class Folder(object):
 
 
     def join(self, *args, **kwargs):
-        ''' join one or more subfolders to the folder or join a file '''
+        '''
+        Description
+        --------------------
+        Join one or more subfolders and/or join a file.
+
+        Parameters
+        ----------
+        args : tuple
+            Arbitrary number of strings to join to the folder.
+
+            Behavior Examples:
+            ------------------
+            Consider the following folder instance:
+            folder = Folder('C:/Users/Me/MyFolder')
+
+            • Unadorned strings are treated like subfolder names:
+    
+                folder.join('A','B')
+                    or
+                folder.join('A/B')
+
+                >> C:/Users/Me/MyFolder/A/B/
+
+            • Strings preceded by a period prior to the final argument are treated
+              like dot folders:
+
+                folder.join('.A','.B','C')
+
+                >> C:/Users/Me/MyFolder/.A/.B/C/
+
+            • Strings preceded by a period that are also the final argument present
+              a special case. It will be treated as a dot file unless you add a slash
+              slash to signal you intend for it to be considered a dot folder.
+
+                In this case, .env would be a dot folder subfile in folder B.
+
+                                        note the slash
+                                              ↓
+                    folder.join('.A','B','.env/')
+
+                Conversely, in this case, .env would be a dot file in folder B.
+
+                    folder.join('.A','B','.env')
+
+            • Strings separated by a period that are also the last argument
+              follow the same logic:
+
+                    folder.join('A','B','MyFile.xlsx')
+                    >> C:/Users/Me/MyFolder/A/B/MyFile.xlsx
+            
+                    folder.join('A','B','C.D/')
+                    >> C:/Users/Me/MyFolder/A/B/C.D/
+                    
+        kwargs : dict
+            spawn keyword arguments
+
+        Returns
+        ----------
+        out : Folder | File
+            folder or file object
+        '''
 
         self.validate_join_args(args)
         f = FileBase.trifurcate_and_join(self.path + '/'.join(args))
