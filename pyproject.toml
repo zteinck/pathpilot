@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "pathpilot"
-version = "0.1.2"
+version = "0.1.3"
 description = "Library that facilitates file and folder manipulation in Python."
 authors = ["Zachary Einck <zacharyeinck@gmail.com>"]
 license = "MIT"
