@@ -3,36 +3,39 @@ import shutil
 import filecmp
 import os
 import pandas as pd
+import numpy as np
+from cachegrab import sha256
+
 from clockwork import (
-    quarter_end, 
-    month_end, 
-    day_of_week, 
-    year_end, 
+    quarter_end,
+    month_end,
+    day_of_week,
+    year_end,
     Date,
     )
 
-from ._folder import Folder
 from .utils import (
-    get_size_label, 
-    check_read_only, 
-    trifurcate, 
+    get_size_label,
+    check_read_only,
+    trifurcate,
     is_file,
+    get_created_date,
+    get_modified_date,
     )
 
+from ._folder import Folder
 
-#+---------------------------------------------------------------------------+
-# Classes
-#+---------------------------------------------------------------------------+
+
 
 class FileBase(object):
     '''
     Description
     --------------------
-    user-friendly object-oriented representation of a file
+    File object
 
     Class Attributes
     --------------------
-    sorter : func
+    factory : func
         function that assigns new file instances to the correct class polymorphism
 
     Instance Attributes
@@ -45,9 +48,9 @@ class FileBase(object):
         the file extension (does not include the period)
     '''
 
-    #+---------------------------------------------------------------------------+
-    # Initialize Instance
-    #+---------------------------------------------------------------------------+
+    #╭-------------------------------------------------------------------------╮
+    #| Initialize Instance                                                     |
+    #╰-------------------------------------------------------------------------╯
 
     def __init__(self, f, read_only=False):
         '''
@@ -63,9 +66,9 @@ class FileBase(object):
         self.read_only = read_only
 
 
-    #+---------------------------------------------------------------------------+
-    # Classes
-    #+---------------------------------------------------------------------------+
+    #╭-------------------------------------------------------------------------╮
+    #| Classes                                                                 |
+    #╰-------------------------------------------------------------------------╯
 
     class Decorators(object):
 
@@ -136,9 +139,9 @@ class FileBase(object):
             return wrapper
 
 
-    #+---------------------------------------------------------------------------+
-    # Class Methods
-    #+---------------------------------------------------------------------------+
+    #╭-------------------------------------------------------------------------╮
+    #| Class Methods                                                           |
+    #╰-------------------------------------------------------------------------╯
 
     @classmethod
     def spawn(cls, *args, **kwargs):
@@ -147,16 +150,16 @@ class FileBase(object):
         is of the correct class polymorphism. For example, if a csv file gets
         changed to an excel file the sorting hat function will correctly change
         the type from CSVFile to ExcelFileBase. The class polymorphism can set
-        sorter = None if the type needs to be retained no matter what. For
+        factory = None if the type needs to be retained no matter what. For
         example, CryptoFile should always spawn more CryptoFiles regardless of
         the file extension.
         '''
-        return (cls.sorter if cls.sorter is not None else cls)(*args, **kwargs)
+        return (cls.factory if cls.factory is not None else cls)(*args, **kwargs)
 
 
-    #+---------------------------------------------------------------------------+
-    # Properties
-    #+---------------------------------------------------------------------------+
+    #╭-------------------------------------------------------------------------╮
+    #| Properties                                                              |
+    #╰-------------------------------------------------------------------------╯
 
     @property
     def ext(self):
@@ -167,19 +170,19 @@ class FileBase(object):
     @property
     def path(self):
         ''' string representation of the file including the full folder '''
-        return self.directory + self.nameext
+        return self.directory + self.name_ext
 
 
     @property
-    def nameext(self):
+    def name_ext(self):
         ''' file name including file extension but exlcuding the folder in string format '''
         return self.name + '.' + self.ext
 
 
     @property
-    def fullname(self):
-        ''' self.nameext alias '''
-        return self.nameext
+    def full_name(self):
+        ''' self.name_ext alias '''
+        return self.name_ext
 
 
     @property
@@ -209,18 +212,59 @@ class FileBase(object):
     @property
     def created_date(self):
         ''' date the file was created '''
-        return Date(pd.to_datetime(os.path.getctime(self.path), unit='s'))
+        return get_created_date(self.path)
 
 
     @property
     def modified_date(self):
         ''' date the file was modified '''
-        return Date(pd.to_datetime(os.path.getmtime(self.path), unit='s'))
+        return get_modified_date(self.path)
 
 
-    #+---------------------------------------------------------------------------+
-    # Magic Methods
-    #+---------------------------------------------------------------------------+
+    @property
+    def hash_value(self):
+        return sha256(self.path)
+
+
+    @property
+    def meta_data(self):
+        s = pd.Series(name='meta_data')
+
+        s.loc['label'] = 'file'
+        s.loc['type'] = self.__class__.__name__
+
+        for k in [
+            'hash_value',
+            'path',
+            'directory',
+            'full_name',
+            'name',
+            'extension',
+            'read_only',
+            'exists',
+            ]:
+            s.loc[k] = getattr(self, k)
+
+        for k in [
+            'created_date',
+            'modified_date',
+            'size',
+            'size_label',
+            ]:
+            if s.loc['exists']:
+                v = getattr(self, k)
+                if 'date' in k: v = v.pandas
+            else:
+                v = np.nan
+
+            s.loc[k] = v
+
+        return s
+
+
+    #╭-------------------------------------------------------------------------╮
+    #| Magic Methods                                                           |
+    #╰-------------------------------------------------------------------------╯
 
     def __repr__(self):
         return self.path.replace('/','\\')
@@ -244,9 +288,9 @@ class FileBase(object):
         return f1 != f2 or not filecmp.cmp(f1, f2)
 
 
-    #+---------------------------------------------------------------------------+
-    # Instance Methods
-    #+---------------------------------------------------------------------------+
+    #╭-------------------------------------------------------------------------╮
+    #| Instance Methods                                                        |
+    #╰-------------------------------------------------------------------------╯
 
     def read(self, *args, **kwargs):
         raise NotImplementedError(f"read function is not supported for files with extension '{self.ext}'")
@@ -271,6 +315,11 @@ class FileBase(object):
     def delete(self):
         ''' delete file if it exists '''
         if self.exists: os.remove(self.path)
+
+
+    def open(self):
+        ''' open file in default program '''
+        os.startfile(self.path)
 
 
     def trifurcate_and_fill(self, f):
@@ -318,7 +367,7 @@ class FileBase(object):
     @check_read_only
     def unzip(self, folder=None, delete_original=False):
         ''' unzips file '''
-        if self.ext != 'zip': raise Exception(f"file '{self.nameext}' is not a zip file")
+        if self.ext != 'zip': raise Exception(f"file '{self.name_ext}' is not a zip file")
         folder = self.directory if folder is None else folder
         with zipfile.ZipFile(self.path, 'r') as f:
             f.extractall(str(folder))
@@ -330,8 +379,10 @@ class FileBase(object):
         ''' quick way of intitializing a new File with different attribute(s)
         (e.g. you have a csv file and want an xlsx file of the same name) '''
         alias_map = {'folder': 'directory', 'ext': 'extension'}
-        kwargs = {alias_map.get(k, k): v for k,v in kwargs.items()}
-        directory, name, extension = [str(kwargs.get(k, getattr(self, k))) for k in ['directory','name','extension']]
+        kwargs = {alias_map.get(k, k): v for k, v in kwargs.items()}
+        directory, name, extension = [
+            str(kwargs.get(k, getattr(self, k)))
+            for k in ['directory','name','extension']]
         if directory[-1] != '/': directory += '/'
         f = directory + name + '.' + extension.replace('.','')
         return self.spawn(f)
@@ -366,12 +417,12 @@ class FileBase(object):
 
     @Decorators.add_timestamp
     def month(self, delta=0):
-        return month_end(delta=delta).sqlsvr
+        return month_end(delta=delta).ymd
 
 
     @Decorators.add_timestamp
     def day(self, weekday, delta=0):
-        return day_of_week(weekday=weekday, delta=delta).sqlsvr
+        return day_of_week(weekday=weekday, delta=delta).ymd
 
 
     @Decorators.add_timestamp

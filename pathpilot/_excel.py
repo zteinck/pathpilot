@@ -1,11 +1,12 @@
 from collections import OrderedDict
+from functools import cached_property
 from copy import deepcopy
-import hashlib
 import sys
 import re
 import pandas as pd
 import numpy as np
 from iterlab import natural_sort, to_iter
+from cachegrab import sha256
 
 from ._file import FileBase
 from .utils import purge_whitespace, get_size_label
@@ -16,40 +17,41 @@ class ExcelFile(FileBase):
     '''
     Description
     --------------------
-    File object that also interfaces with ExcelWriter to facilitate working with Excel files.
-    This documentation is for the polymorphism only. See the base class for more information.
+    Excel file object
 
     Class Attributes
     --------------------
-    ...
+    See parent class documentation.
 
     Instance Attributes
     --------------------
     writer : ExcelWriter
         pd.ExcelWriter instance
+    active_sheet : xlsxwriter.worksheet.Worksheet
+        The active worksheet
+    sheet_cache : dict
+        Dictionary where the keys are worksheet names and values are the worksheet
+        objects. It is important to note that the keys are the original sheet names
+        passed by the user as opposed to the actual name that appears in the excel
+        file and worksheet.name attribute because the latter is truncated by the 31
+        character limit and/or will have a page prefix added per the 'number_tabs'
+        argument. This setup allows the user to access the sheet using the original
+        name.
     formats : dict
         keys are strings representing names of formats and values are dictionaries
         containing format parameters. For Example, {{'bold': {'bold': True}}. These
         are intended to be frequently used formats that can be both used individually
         and as building blocks for more complex formats (see self.add_format for more
         information.)
-    active_worksheet : xlsxwriter.worksheet.Worksheet
-        The active worksheet
     format_cache : dict
         keys are hashes of sorted dictionaries containing format parameters and
         values are xlsxwriter.format.Format. This is done so that only one
         format instance will be created per unique format used.
-    sheet_cache : dict
-        keys are worksheet names and values are the actual worksheet names as
-        they appear in the spreadsheet. The reasoning behind this is that the
-        desired name may be truncated by the 31 character limit or have a page
-        prefix added so this allows the user to access the sheet using the
-        original name.
     number_tabs : bool
         if True, tabs in the workbook will have a number prefix. For example,
         'MyTab' would be appear as '1 - MyTab' in the workbook.
     page : int
-        the current tab number
+        keeps track of the current tab number
     verbose : bool
         if True, information is printed when a worksheet is created or written to.
     troubleshoot : bool
@@ -57,14 +59,13 @@ class ExcelFile(FileBase):
 
     Notes:
     --------------------
-    This URL contains instructions on how to get LibreOffice to calculate formulas (0 by default)
-    https://stackoverflow.com/questions/32205927/xlsxwriter-and-libreoffice-not-showing-formulas-result
-
+        • This URL contains instructions on how to get LibreOffice to calculate formulas (0 by default)
+        https://stackoverflow.com/questions/32205927/xlsxwriter-and-libreoffice-not-showing-formulas-result
     '''
 
-    #+---------------------------------------------------------------------------+
-    # Initialize Instance
-    #+---------------------------------------------------------------------------+
+    #╭-------------------------------------------------------------------------╮
+    #| Initialize Instance                                                     |
+    #╰-------------------------------------------------------------------------╯
 
     def __init__(self, f, number_tabs=False, verbose=True, troubleshoot=False, **kwargs):
         super().__init__(f, **kwargs)
@@ -76,9 +77,9 @@ class ExcelFile(FileBase):
         self.troubleshoot = troubleshoot
 
 
-    #+---------------------------------------------------------------------------+
-    # Static Methods
-    #+---------------------------------------------------------------------------+
+    #╭-------------------------------------------------------------------------╮
+    #| Static Methods                                                          |
+    #╰-------------------------------------------------------------------------╯
 
     @staticmethod
     def get_column_letter(index):
@@ -145,9 +146,9 @@ class ExcelFile(FileBase):
         return '#%02x%02x%02x' % (red, green, blue)
 
 
-    #+---------------------------------------------------------------------------+
-    # Properties
-    #+---------------------------------------------------------------------------+
+    #╭-------------------------------------------------------------------------╮
+    #| Properties                                                              |
+    #╰-------------------------------------------------------------------------╯
 
     @property
     def workbook(self):
@@ -155,21 +156,118 @@ class ExcelFile(FileBase):
 
 
     @property
-    def worksheet_names(self):
-        return [worksheet.name for worksheet in self]
+    def sheet_names(self):
+        ''' list of the actual sheet names '''
+        return [sheet.name for sheet in self.sheets]
 
 
-    #+---------------------------------------------------------------------------+
-    # Magic Methods
-    #+---------------------------------------------------------------------------+
+    @property
+    def sheets(self):
+        ''' list of worksheet objects '''
+        return list(self.sheet_cache.values())
+
+
+    @cached_property
+    def writer(self):
+        if self.verbose: print(f'\nCreating {self.name_ext}')
+        return pd.ExcelWriter(self.path)
+
+
+    @property
+    def active_sheet(self):
+        ''' current active worksheet '''
+        if not hasattr(self, '_active_sheet'):
+            self.create_worksheet('Sheet1')
+        return self._active_sheet
+
+
+    @active_sheet.setter
+    def active_sheet(self, sheet):
+        if not isinstance(sheet, str):
+            raise TypeError(f"'sheet' argument must be a string, not {type(sheet)}")
+
+        if sheet in self.sheet_cache:
+            self._active_sheet = self.sheet_cache[sheet]
+        else:
+            self.create_worksheet(sheet)
+
+
+    @cached_property
+    def formats(self):
+
+        header_body_presets = {
+            'text_wrap': True,
+            'border': True,
+            'align': 'left',
+            'valign': 'top'
+            }
+
+        format_presets = {
+            # Font
+            'bold': {'bold': True},
+
+            # Alignment
+            'text_wrap': {'text_wrap': True},
+
+            # Pattern
+            'highlight': {'fg_color': 'yellow'},
+
+            # Protection
+            'unlocked': {'locked': 0},
+
+            # Number
+            'commas': {'num_format': '#,##0'},
+            'commas_two_decimals': {'num_format': '#,##0.00'},
+
+            # Percent
+            'percent': {'num_format': '0%'},
+            'percent_one_decimals': {'num_format': '0.0%'},
+            'percent_two_decimals': {'num_format': '0.00%'},
+
+            # Date
+            'date': {'num_format': 'mm/dd/yyyy'},
+            'datetime': {'num_format': 'mm/dd/yyyy hh:mm:ss'},
+            # 'datetime': {'num_format': 'mm/dd/yyyy hh:mm:ss.000 AM/PM'},
+
+            # Border
+            'top': {'top': True},
+            'bottom': {'bottom': True},
+            'left': {'left': True},
+            'right': {'right': True},
+
+            # Header
+            'pandas_header': {'border': True, 'align': 'center', 'valign': 'vcenter', 'bold': True},
+            'black_header': {'text_wrap': True, 'fg_color': 'black', 'border': True, 'align': 'center',
+                             'valign': 'vcenter', 'bold': True, 'font_color': 'white'},
+            'white_body': header_body_presets,
+            'gold_body': {**header_body_presets, 'fg_color': '#FFE265'},
+            'turqoise_body': {**header_body_presets, 'fg_color': '#CCFFFF'},
+
+            # Miscellaneous
+            'default_merge': {'border': True, 'align': 'top','text_wrap': True},
+            'gold_wrap': {'border': True, 'align': 'top','text_wrap': True, 'fg_color': '#FFE265'},
+            'bold_total': {'align': 'right', 'bold': True},
+            'header': {'bold': True,'bottom': True, 'text_wrap': True},
+
+            # Conditional
+            'conditional_red': {'bg_color': '#FFC7CE', 'font_color': '#9C0006'},
+            'conditional_green': {'bg_color': '#C6EFCE', 'font_color': '#006100'},
+            'conditional_yellow': {'bg_color': '#FFEB9C', 'font_color': '#9C6500'},
+            }
+
+        return format_presets
+
+
+    #╭-------------------------------------------------------------------------╮
+    #| Magic Methods                                                           |
+    #╰-------------------------------------------------------------------------╯
 
     def __getattr__(self, name):
         '''
         Description
         ------------
-        Used to access an object's attributes that do not exist or cannot be accessed through normal means.
-        It is called when an attribute is accessed using the dot notation (.). In this case, attributes that
-        do not exist will be gotten from the currently active worksheet object (e.g. '.hide_gridlines').
+        Called when an attribute is referenced that does not exist. In this case, attributes that
+        do not exist will be assumed to be active worksheet object attributes (e.g. '.hide_gridlines').
 
         Parameters
         ------------
@@ -178,39 +276,28 @@ class ExcelFile(FileBase):
 
         Returns
         ------------
-        out : ...
+        out : *
             xlsxwriter.worksheet.Worksheet attribute
         '''
 
         if self.troubleshoot:
             print(f"self.__getattr__(name='{name}')")
 
-        if name == 'writer':
-            self.writer = pd.ExcelWriter(self.path)
-            if self.verbose: print(f'\nCreating {self.nameext}')
-            return self.writer
-        elif name == 'formats':
-            self.formats = self._get_preset_formats()
-            return self.formats
-        elif name == 'active_worksheet':
-            self.create_worksheet('Sheet1')
-            return self.active_worksheet
-        else:
-            return getattr(self.active_worksheet, name)
+        return getattr(self.active_sheet, name)
+
 
 
     def __getitem__(self, key):
         '''
         Description
         ------------
-        Used to access an object's items using the square bracket notation. It is called when an object is indexed
-        or sliced with square brackets ([]). In this case, indexing and slicing is applied to writer.book.worksheets_objs
-        which will return one or more xlsxwriter.worksheet.Worksheet objects.
+        Indexing and slicing is applied to existing worksheets.
 
         Parameters
         ------------
-        key : int | slice
-            key
+        key : int | slice | str
+            • if int or slice, applied to list of worksheet objects
+            • if str, treated like a sheet_cache key (i.e. sheet name)
 
         Returns
         ------------
@@ -218,35 +305,27 @@ class ExcelFile(FileBase):
              one or more worksheet objects
         '''
         if isinstance(key, (int, slice)):
-            return self.workbook.worksheets_objs[key]
+            return self.sheets[key]
         elif isinstance(key, str):
-            for worksheet in self:
-                if worksheet.name in (key, self.sheet_cache.get(key)):
-                    return worksheet
-            raise KeyError(key)
+            return self.sheet_cache[key]
         else:
             raise TypeError(f"Invalid argument type: '{type(key)}'")
 
 
     def __iter__(self):
         ''' iterate through worksheet objects '''
-        for worksheet in self.workbook.worksheets_objs:
-            yield worksheet
+        for key, sheet in self.sheet_cache.items():
+            yield key, sheet
 
 
     def __contains__(self, key):
         ''' returns True if worksheet exists in workbook '''
-        try:
-            self[key]
-            return True
-        except:
-            return False
+        return key in self.sheet_cache
 
 
-
-    #+---------------------------------------------------------------------------+
-    # Instance Methods
-    #+---------------------------------------------------------------------------+
+    #╭-------------------------------------------------------------------------╮
+    #| Instance Methods                                                        |
+    #╰-------------------------------------------------------------------------╯
 
     @purge_whitespace
     def read(self, **kwargs):
@@ -258,15 +337,45 @@ class ExcelFile(FileBase):
         return df
 
 
+
     def _save(self, args=None, sheets=None, **kwargs):
-        
-        if isinstance(args, dict):
-            if sheets is not None: raise ValueError
-            sheets = list(args.keys())
-            args = list(args.values())
+        '''
+        Description
+        ------------
+        Save the excel file
+
+        Parameters
+        ------------
+        args : pd.DataFrame | list | dict
+            • if list, each dataframe in the list is written to a separate worksheet
+            • if dict, the keys are considered sheet names and the values should be
+                       dataframes. (i.e. {'My Sheet 1': df1, 'My Sheet 2': df2}).
+                       You may not pass a sheets argument when passing a dictionary
+                       as the args argument.
+        sheets :
+
+        Returns
+        ------------
+        None
+        '''
 
         if args is not None:
-            for i, arg in enumerate(to_iter(args)):
+
+            if isinstance(args, dict):
+                if sheets is not None:
+                    raise ValueError("'sheets' argument must be None when a dictionary is passed")
+                sheets = list(args.keys())
+                args = list(args.values())
+            else:
+                args = to_iter(args)
+
+            if sheets is not None:
+                sheets = to_iter(sheets)
+                if len(args) != len(sheets):
+                    raise ValueError(
+                        f"length of 'args' ({len(args)}) != length of 'sheets' ({len(sheets)}).")
+
+            for i, arg in enumerate(args):
                 self.write_df(
                     df=arg,
                     sheet=sheets[i] if sheets else f'Sheet{i + 1}',
@@ -276,24 +385,36 @@ class ExcelFile(FileBase):
         self.writer.close()
 
 
-    def set_active_worksheet(self, key):
-        self.active_worksheet = self[key]
-
 
     def create_worksheet(self, name):
         ''' create a new worksheet and set it as the active worksheet '''
+
+        key = name[:]
+
+        if key in self.sheet_cache:
+            raise ValueError(f"a worksheet with name='{name}' was already created.")
+
         if self.number_tabs:
             self.page += 1
-            out = f'{self.page} - {name}'
-        else:
-            out = name[:]
-        out = out[:31] # Excel has a 31 character limit
-        self.active_worksheet = self.workbook.add_worksheet(out)
-        self.sheet_cache[name] = out
-        return out
+            name = f'{self.page} - {name}'
+
+        name = name[:31] # Excel has a 31 character limit
+
+        self.sheet_cache[key] = self.workbook.add_worksheet(name)
+        self.active_sheet = key
 
 
-    def write(self, start_cell, data, formatting=None, inverse=False, repeat=None, sheet=None, outer_border=False):
+
+    def write(
+        self,
+        start_cell,
+        data,
+        formatting=None,
+        inverse=False,
+        repeat=None,
+        sheet=None,
+        outer_border=False
+        ):
         '''
         Description
         ------------
@@ -312,30 +433,29 @@ class ExcelFile(FileBase):
             with 1, 2, 3 and 'a', 'b', 'c', respectively.
         formatting : str | dict | one-dimensional list | one-dimensional tuple | None
             Excel formatting to be applied to data. Supported types include:
-                • str -> Strings are interpreted as self.formats dictionary keys. Passing a
+                • str ➜ Strings are interpreted as self.formats dictionary keys. Passing a
                          single string (e.g. formatting='bold') causes the corresponding format
                          to be be universally applied to all data cells.
-                • dict -> Dictionaries are interpreted as format parameters. Passing a single
+                • dict ➜ Dictionaries are interpreted as format parameters. Passing a single
                           dictionary (e.g. formatting={'bold': True, 'num_format': '#,##0'})
                           causes the corresponding format to be be universally applied to all
                           data cells.
-                • list | tuple -> formats included in a list/tuuple are applied to columns in
+                • list | tuple ➜ formats included in a list/tuuple are applied to columns in
                           sequential order. If the length of the list/tuple is shorter than the
                            number of columns then no format is applied to the remaining columns.
-                • None -> no formatting is applied
+                • None ➜ no formatting is applied
         inverse : bool
             If True, the 2D data is inverted such that each sub-list is treated as column data as
             opposed to row data under the default behavior.
-            (e.g. [[1, 2, 3], ['a', 'b', 'c']] -> [[1, 'a'], [2, 'b'], [3, 'c']]
+            (e.g. [[1, 2, 3], ['a', 'b', 'c']] ➜ [[1, 'a'], [2, 'b'], [3, 'c']]
         repeat : int
             If 'data' argument is a single data element then it will be repeated or duplicated
             this number of times.
-        sheet : str | int
-            If None, self.active_worksheet is utilized. If self.active_worksheet has not yet been
-            assigned then it is assigned to a newly created blank worksheet named 'Sheet1'.
-            If not None, self.active_worksheet will be assigned via self.set_active_worksheet.
-            If the worksheet does not already exist and sheet is of type 'str', it is created as
-            a new blank worksheet.
+        sheet : str
+            If None, self.active_sheet is utilized. If self.active_sheet has not yet been
+            assigned, it will be assigned to a newly created blank worksheet named 'Sheet1'.
+            If not None, self.active_sheet will be assigned to the passed sheet name. If the
+            passed name does not correspond to an existing sheet, it will be created.
         outer_border : bool
             If True, data is encased in an outer border.
 
@@ -371,16 +491,8 @@ class ExcelFile(FileBase):
             return self.get_format(fmt)
 
 
-
         if sheet is not None:
-            if sheet in self:
-                self.set_active_worksheet(sheet)
-            else:
-                if isinstance(sheet, str):
-                    self.create_worksheet(sheet)
-                else:
-                    raise TypeError(f"'sheet' argument must be a string if worksheet has not been created yet, not {type(sheet)}")
-
+            self.active_sheet = sheet
 
         if isinstance(data, (pd.DataFrame, pd.Series)):
             self.write_df(
@@ -396,7 +508,7 @@ class ExcelFile(FileBase):
 
         if self.verbose:
              size_label = get_size_label(sys.getsizeof(data))
-             print(f"\twriting {size_label} to '{self.active_worksheet.name}' tab", end='... ')
+             print(f"\twriting {size_label} to '{self.active_sheet.name}' tab", end='... ')
 
         if not data:
             if self.verbose: print('SKIPPED')
@@ -424,7 +536,7 @@ class ExcelFile(FileBase):
 
         for row_idx, row in enumerate(data):
             for col_idx, cell in enumerate(row):
-                self.active_worksheet.write(
+                self.active_sheet.write(
                     start_row + row_idx,
                     start_col + col_idx,
                     cell if pd.notnull(cell) else None,
@@ -465,16 +577,16 @@ class ExcelFile(FileBase):
             DataFrame to be written to worksheet. If a Series is passed it will be
             converted to a DataFrame. Note: a copy is created so the original object
             will be unchanged.
-        sheet : ^
+        sheet : ↑
             See self.write documentation.
-        start_cell : ^
+        start_cell : ↑
             See self.write documentation.
-        header_format : ^
+        header_format : ↑
             See self.write 'formatting' argument documentation.
-        data_format : ^
+        data_format : ↑
             Special cases:
-            • 'auto' -> formatting is automatically applied to numeric, percent, and date fields.
-            • dict -> if the dictionary keys are only comprised of 'df' index or column names then
+            • 'auto' ➜ formatting is automatically applied to numeric, percent, and date fields.
+            • dict ➜ if the dictionary keys are only comprised of 'df' index or column names then
                       the values are treated like format parameters and formatting is only applied
                       to those columns included in the keys. If not all the key values are column
                       names then the dictionary receives the default treatment outlined in the self.write
@@ -482,15 +594,15 @@ class ExcelFile(FileBase):
             Other cases:
                 see self.write 'formatting' argument documentation.
         column_widths : 'auto' | list | tuple | dict
-            • 'auto' -> xlsxwriter does not support auto-fitting column widths so
+            • 'auto' ➜ xlsxwriter does not support auto-fitting column widths so
                            this attempts replicate it by setting the column width
                            according to the length of the values in each column
                            (up to a certain limit).
-            • list | tuple -> widths are applied to columns in sequential order.
+            • list | tuple ➜ widths are applied to columns in sequential order.
                            If the length of the list/tuple is shorter than the
                            number of columns then the width is not set on the
                            remaining columns.
-            • dict -> dictionary where keys are DataFrame column names and values
+            • dict ➜ dictionary where keys are DataFrame column names and values
                            are column widths. Any column names excluded from the
                            dictionary will not have their widths set.
         normalize : bool
@@ -720,7 +832,16 @@ class ExcelFile(FileBase):
                 )
 
 
-    def fill_formula(self, start_cell, formula, limit, headers=None, formatting=None, down=True, outer_border=False):
+    def fill_formula(
+        self,
+        start_cell,
+        formula,
+        limit,
+        headers=None,
+        formatting=None,
+        down=True,
+        outer_border=False
+        ):
         '''
         Description
         ------------
@@ -805,21 +926,21 @@ class ExcelFile(FileBase):
         Parameters
         ------------
         name : str | tuple | list
-            • str -> name of new format.
+            • str ➜ name of new format.
                      If 'fmt' is None, if the name is already in self.formats then
                      no action is taken. If the name does not already exist then
                      the name's components (delimited by underscores ('_')) will be
                      combined into a new format (e.g. 'bold_commas').
                      if 'fmt' is not None, if the name conflicts with an existing format
                      name, the existing format will be overwritten.
-            • tuple | list -> If 'fmt' is None, components will be combined into a new
+            • tuple | list ➜ If 'fmt' is None, components will be combined into a new
                      format. For example, self.add_format(name=['bold','commas'], fmt=None)
                      would add the following entry to self.formats:
                      {'bold_commas': {'bold': True, 'num_format': '#,##0'}
 
         fmt : dict | None
-            • dict -> see https://xlsxwriter.readthedocs.io/format.html
-            • None -> format will be constructed based on the components
+            • dict ➜ see https://xlsxwriter.readthedocs.io/format.html
+            • None ➜ format will be constructed based on the components
 
         Returns
         ------------
@@ -856,11 +977,11 @@ class ExcelFile(FileBase):
         Parameters
         ------------
         arg : str | tuple | list | dict | None
-            • str | tuple | list -> passed to add_format as 'name' argument.
-            • dict -> Format parameters. The resulting format will not be available in self.formats
+            • str | tuple | list ➜ passed to add_format as 'name' argument.
+            • dict ➜ Format parameters. The resulting format will not be available in self.formats
                       but it will still be cached and can be accessed by passing the same dictionary
                       to this function.
-            • None -> None is returned
+            • None ➜ None is returned
 
         Returns
         ------------
@@ -873,76 +994,8 @@ class ExcelFile(FileBase):
             name = self.add_format(name=arg)
             arg = self.formats[name]
 
-        sha256 = hashlib.sha256()
-        sha256.update(bytes(str(sorted(list(arg.items()))), encoding='utf-8'))
-        key = sha256.hexdigest()
+        key = sha256(str(sorted(list(arg.items()))))
         if key not in self.format_cache:
             self.format_cache[key] = self.workbook.add_format(arg)
 
         return self.format_cache[key]
-
-
-    def _get_preset_formats(self):
-        ''' frequently used formats '''
-
-        header_body_presets = {
-            'text_wrap': True,
-            'border': True,
-            'align': 'left',
-            'valign': 'top'
-            }
-
-        formats = {
-            # Font
-            'bold': {'bold': True},
-
-            # Alignment
-            'text_wrap': {'text_wrap': True},
-
-            # Pattern
-            'highlight': {'fg_color': 'yellow'},
-
-            # Protection
-            'unlocked': {'locked': 0},
-
-            # Number
-            'commas': {'num_format': '#,##0'},
-            'commas_two_decimals': {'num_format': '#,##0.00'},
-
-            # Percent
-            'percent': {'num_format': '0%'},
-            'percent_one_decimals': {'num_format': '0.0%'},
-            'percent_two_decimals': {'num_format': '0.00%'},
-
-            # Date
-            'date': {'num_format': 'mm/dd/yyyy'},
-            'datetime': {'num_format': 'mm/dd/yyyy hh:mm:ss'},
-            # 'datetime': {'num_format': 'mm/dd/yyyy hh:mm:ss.000 AM/PM'},
-
-            # Border
-            'top': {'top': True},
-            'bottom': {'bottom': True},
-            'left': {'left': True},
-            'right': {'right': True},
-
-            # Header
-            'pandas_header': {'border': True, 'align': 'center', 'valign': 'vcenter', 'bold': True},
-            'black_header': {'text_wrap': True, 'fg_color': 'black', 'border': True, 'align': 'center',
-                             'valign': 'vcenter', 'bold': True, 'font_color': 'white'},
-            'white_body': header_body_presets,
-            'gold_body': {**header_body_presets, 'fg_color': '#FFE265'},
-            'turqoise_body': {**header_body_presets, 'fg_color': '#CCFFFF'},
-
-            # Miscellaneous
-            'default_merge': {'border': True, 'align': 'top','text_wrap': True},
-            'gold_wrap': {'border': True, 'align': 'top','text_wrap': True, 'fg_color': '#FFE265'},
-            'bold_total': {'align': 'right', 'bold': True},
-            'header': {'bold': True,'bottom': True, 'text_wrap': True},
-
-            # Conditional
-            'conditional_red': {'bg_color': '#FFC7CE', 'font_color': '#9C0006'},
-            'conditional_green': {'bg_color': '#C6EFCE', 'font_color': '#006100'},
-            'conditional_yellow': {'bg_color': '#FFEB9C', 'font_color': '#9C6500'},
-            }
-
-        return formats

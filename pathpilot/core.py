@@ -9,6 +9,9 @@ from ._sqlite import SQLiteFile
 from .utils import trifurcate, get_cwd
 
 
+#╭-------------------------------------------------------------------------╮
+#| Variables                                                               |
+#╰-------------------------------------------------------------------------╯
 
 extension_mapping = {
     'xlsx': ExcelFile,
@@ -22,6 +25,10 @@ extension_mapping = {
     }
 
 
+#╭-------------------------------------------------------------------------╮
+#| Functions                                                               |
+#╰-------------------------------------------------------------------------╯
+
 def File(f, **kwargs):
     ''' assigns new file instances to the correct class polymorphism '''
     extension = trifurcate(f)[-1]
@@ -31,7 +38,6 @@ def File(f, **kwargs):
 
 def get_python_path(*args, **kwargs):
     ''' return python path environmental variable as a Folder object '''
-
     return Folder(get_cwd(), *args, **kwargs)
 
 
@@ -39,5 +45,9 @@ def get_data_path():
     return get_python_path().parent.join('Data', read_only=False)
 
 
-FileBase.sorter = File
-Folder.sorter = File
+#╭-------------------------------------------------------------------------╮
+#| Assign Class Attribute                                                  |
+#╰-------------------------------------------------------------------------╯
+
+FileBase.factory = File
+Folder.factory = File

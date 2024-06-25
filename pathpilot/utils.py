@@ -1,10 +1,17 @@
 import shutil
 import filecmp
-import numpy as np
 import math
 import os
+import datetime
+import inspect
+import numpy as np
+from clockwork import Date
 
 
+
+#╭-------------------------------------------------------------------------╮
+#| Classes                                                                 |
+#╰-------------------------------------------------------------------------╯
 
 class ReadOnlyError(Exception):
 
@@ -12,12 +19,17 @@ class ReadOnlyError(Exception):
         super().__init__(message or 'cannot perform this action in read-only mode')
 
 
+
+#+---------------------------------------------------------------------------+
+# Functions
+#+---------------------------------------------------------------------------+
+
 def check_read_only(func):
-    
+
     def wrapper(self, *args, **kwargs):
         if self.read_only: raise ReadOnlyError
         return func(self, *args, **kwargs)
-    
+
     return wrapper
 
 
@@ -194,3 +206,51 @@ def purge_whitespace(func):
         return df
 
     return wrapper
+
+
+def timestamp_to_date(func):
+
+    def wrapper(path):
+        return Date(datetime.datetime.fromtimestamp(func(path)))
+
+    return wrapper
+
+
+@timestamp_to_date
+def get_created_date(path):
+    return os.path.getctime(path)
+
+
+@timestamp_to_date
+def get_modified_date(path):
+    return os.path.getmtime(path)
+
+
+def verify_is_folder(func):
+
+    def wrapper(f):
+        f = str(f)
+        if not is_folder(f):
+            raise TypeError(f"{f} is not a folder")
+        return func(f)
+
+    return wrapper
+
+
+@verify_is_folder
+def create_folder(f):
+    ''' create folder if it does not already exist '''
+    if not os.path.exists(f):
+        os.mkdir(f)
+
+
+@verify_is_folder
+def delete_folder(f):
+    ''' delete folder if it exists '''
+    if os.path.exists(f):
+        shutil.rmtree(f)
+
+
+def get_object_folder(obj):
+    ''' return file folder of Python object '''
+    return os.path.absfolder(inspect.getfile(obj))

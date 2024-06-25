@@ -14,29 +14,29 @@ class ZipFile(FileBase):
     supports zipping multiple files and folders.
     '''
 
-    #+---------------------------------------------------------------------------+
-    # Initialize Instance
-    #+---------------------------------------------------------------------------+
+    #╭-------------------------------------------------------------------------╮
+    #| Initialize Instance                                                     |
+    #╰-------------------------------------------------------------------------╯
 
     def __init__(self, f, **kwargs):
         super().__init__(f, **kwargs)
 
 
-    #+---------------------------------------------------------------------------+
-    # Instance Attributes
-    #+---------------------------------------------------------------------------+
+    #╭-------------------------------------------------------------------------╮
+    #| Instance Methods                                                        |
+    #╰-------------------------------------------------------------------------╯
 
     def _save(self, *args, **kwargs):
         self.zip(*args, **kwargs)
 
 
     def zip(
-        self, 
-        payload, 
-        delete_original=False, 
-        filter_func=None, 
-        include_folders=False, 
-        files_only=False, 
+        self,
+        payload,
+        delete_original=False,
+        filter_func=None,
+        include_folders=False,
+        files_only=False,
         verbose=False
         ):
         '''

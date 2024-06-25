@@ -23,6 +23,4 @@ class CSVFile(FileBase):
 
 
     def _save(self, obj, **kwargs):
-        if not hasattr(obj, 'to_csv'):
-            raise NotImplementedError(f"saving objects of type '{type(obj)}' is not supported")
         obj.to_csv(self.path, **kwargs)
