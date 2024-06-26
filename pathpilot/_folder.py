@@ -142,6 +142,12 @@ class Folder(object):
 
 
         @property
+        def exists(self):
+            ''' True if any such objects exist '''
+            return self.count > 0
+
+
+        @property
         def read_only(self):
             return self.folder.read_only
 
@@ -494,7 +500,7 @@ class Folder(object):
 
         parent = self.spawn(
             '/'.join(hierarchy[:-1]) + '/',
-            read_only=True
+            read_only=self.read_only
             )
 
         return parent
