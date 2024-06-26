@@ -176,7 +176,8 @@ class ExcelFile(FileBase):
     @property
     def active_sheet(self):
         ''' current active worksheet '''
-        if not hasattr(self, '_active_sheet'):
+        # used __dict__ because hasattr calls __getattr__ when attr not found in __dict__
+        if '_active_sheet' not in self.__dict__:
             self.create_worksheet('Sheet1')
         return self._active_sheet
 
