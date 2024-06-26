@@ -121,7 +121,7 @@ class ZipFile(FileBase):
 
 
         if self.ext != 'zip':
-            raise Exception(f"file '{self.nameext}' is not a zip file")
+            raise Exception(f"file '{self.name_ext}' is not a zip file")
 
         if include_folders and files_only:
             raise ValueError("'include_folders' and 'files_only' arguments cannot both be True")
@@ -136,10 +136,10 @@ class ZipFile(FileBase):
                 return False
 
             if files_only:
-                arcname = f.nameext
+                arcname = f.name_ext
             else:
                 if not include_folders: p = p[1:]
-                arcname = '/'.join(p + [f.nameext])
+                arcname = '/'.join(p + [f.name_ext])
 
             zip_obj.write(f.path, arcname=arcname)
             if delete_original: f.delete()
