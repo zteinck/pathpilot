@@ -61,15 +61,16 @@ def trifurcate_and_join(f):
     return (folder + name + '.' + ext) if ext else folder
 
 
-def trifurcate(f):
+def trifurcate(f, default_folder=True):
     ''' split argument into folder, file name, and file extension components '''
-    f = str(f).replace('\\','/')
+    f = str(f).replace('\\','/').strip()
+    if not f: raise ValueError("'f' argument cannot be empty")
     explicitly_folder = f[-1] == '/'
     f = '/'.join([x for x in f.split('/') if x])
     f = f + '/' if explicitly_folder or '.' not in f.split('/')[-1] else f
     if f.split('/')[0][-4:].lower() == '.com': f = '//' + f
     f = f.rsplit('/', 1)
-    folder = f[0] + '/' if len(f) == 2 else get_cwd()
+    folder = f[0] + '/' if len(f) == 2 else (get_cwd() if default_folder else '')
     name, ext = split_extension(f[-1])
     return folder, name, ext.lower()
 
