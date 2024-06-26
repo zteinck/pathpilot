@@ -17,6 +17,7 @@ from clockwork import (
 from .utils import (
     get_size_label,
     check_read_only,
+    ReadOnlyError,
     trifurcate,
     is_file,
     get_created_date,
@@ -60,7 +61,7 @@ class FileBase(object):
             file folder
         '''
         if not is_file(f):
-            raise ValueError(f'Passed argument {f} is not a file.')
+            raise ValueError(f'Passed argument is not a file (f={f})')
 
         self.directory, self.name, self.extension = trifurcate(f)
         self.read_only = read_only
@@ -75,28 +76,44 @@ class FileBase(object):
         @staticmethod
         def move_file(func):
 
-            @check_read_only
-            def wrapper(self, name, overwrite=True, raise_on_exist=True, raise_on_overwrite=True):
+            # @check_read_only
+            def wrapper(
+                self,
+                destination,
+                overwrite=True,
+                raise_on_exist=True,
+                raise_on_overwrite=True
+                ):
                 '''
                 Parameters
                 ------------
-                name : str | object
-                    File object or str representing destination. If Folder then file is moved to that folder with the same name.
+                destination : str | object
+                    File object or string file path. If Folder, then file is moved to that folder.
                 overwrite : bool
-                    if True, if the destination file already exists it will be overwritten otherwise behavior is determined by
-                    the raise_on_overwrite arg. If False, the destination file is returned.
+                    if True, if the destination file already exists, it will be overwritten otherwise behavior
+                             is determined by the raise_on_overwrite arg.
+                    If False, the destination file is returned.
                 raise_on_exist : bool
-                    if True, if the file to be copied does not exist then an exception is raised
+                    if True, if the file to be copied does not exist then an exception is raised.
                 raise_on_overwrite : bool
-                    if True and overwrite is False then an exception will be raised if the destination file already exists
+                    if True and overwrite is False, then an exception will be raised if the destination file
+                    already exists.
                 '''
 
-                f = name.join(self.fullname) if isinstance(name, Folder) else self.trifurcate_and_fill(name)
+                f = destination.join(self.full_name) if isinstance(destination, Folder) \
+                    else self.trifurcate_and_fill(destination)
+
+                if self.read_only and func.__name__ != 'copy':
+                    raise ReadOnlyError
+
+                if f.read_only:
+                    raise ReadOnlyError(f"Destination is in read-only mode: {destination.path}")
+
                 # print(f'copying {self.path} -> {f}...')
 
                 if not overwrite and f.exists:
                     if raise_on_overwrite:
-                        raise Exception(f"Copy failed. File already exists in destination:\n'{f.fullname}'")
+                        raise Exception(f"Copy failed. File already exists in destination:\n'{f.full_name}'")
                     else:
                         return f
 
@@ -200,13 +217,13 @@ class FileBase(object):
     @property
     def size(self):
         ''' the current size of the file expressed in bytes '''
-        return os.stat(self.path).st_size if self.exists else None
+        return os.stat(self.path).st_size
 
 
     @property
     def size_label(self):
         ''' the current size of the file expressed in bytes '''
-        return get_size_label(self.size) if self.exists else None
+        return get_size_label(self.size)
 
 
     @property
@@ -324,42 +341,48 @@ class FileBase(object):
 
     def trifurcate_and_fill(self, f):
         ''' trifurcates file and fills gaps with instance attributes '''
-        folder, name, ext = trifurcate(f)
+        folder, name, ext = trifurcate(f, default_folder=False)
         f = (folder or self.directory) + (name or self.name) + '.' + (ext or self.ext)
         return self.spawn(f)
 
 
     @Decorators.move_file
-    def rename(self, name):
-        ''' Renames file. You can essentially use this as a cut and paste if you specify the new directory.
-        You can also change the file extention if you wish '''
-        os.rename(self.path, name.path)
+    def rename(self, destination):
+        ''' Renames file. You can essentially use this as a cut and paste if you specify
+            the new directory. You can also change the file extention if you wish '''
+        os.rename(self.path, destination.path)
 
 
     @Decorators.move_file
-    def cut(self, name, **kwargs):
+    def cut(self, destination, **kwargs):
         ''' cut and paste the file to a new location '''
-        return shutil.move(self.path, name.path)
+        return shutil.move(self.path, destination.path)
 
 
     @Decorators.move_file
-    def copy(self, name, **kwargs):
+    def copy(self, destination, **kwargs):
         ''' copy the file to a new location '''
-        shutil.copyfile(self.path, name.path)
+        shutil.copyfile(self.path, destination.path)
 
 
-    def require(self, name):
-        ''' special case of self.copy where file is copied to destination ONLY if it does not already exist '''
-        return self.copy(name, overwrite=False, raise_on_exist=False, raise_on_overwrite=False)
+    def require(self, destination):
+        ''' special case of self.copy where file is copied to destination ONLY
+            if it does not already exist '''
+        return self.copy(
+            destination,
+            overwrite=False,
+            raise_on_exist=False,
+            raise_on_overwrite=False
+            )
 
 
     @check_read_only
     def zip(self, name=None, delete_original=False):
         ''' zips a single file '''
+        if not self.exists: raise Exception(f"'{self}' cannot be zipped because it does not exist?")
         f = self.trifurcate_and_fill(name or self.path)
-        if f.ext != 'zip': f = self.spawn(f'{f.folder}{f.name}.zip')
-        if not self.exists: raise Exception(f"'{self}' cannot be zipped because it does not exist")
-        zipfile.ZipFile(f.path, 'w', zipfile.ZIP_DEFLATED).write(self.path, arcname=self.fullname)
+        if f.ext != 'zip': f = f.swap(ext='zip')
+        zipfile.ZipFile(f.path, 'w', zipfile.ZIP_DEFLATED).write(self.path, arcname=self.full_name)
         if delete_original: self.delete()
         return f
 
@@ -390,19 +413,17 @@ class FileBase(object):
 
     def deep_copy(self):
         ''' create a copy of the File object '''
-        return self.trifurcate_and_fill(str(self.path))
+        return self.spawn(self.path)
 
 
-    def prefix(self, prefix):
+    def prefix(self, prefix, delimiter=' '):
         ''' add prefix to file name '''
-        name = f'{prefix} {self.name}'
-        return self.swap(name=name)
+        return self.swap(name=delimiter.join((prefix, self.name)))
 
 
-    def suffix(self, suffix):
+    def suffix(self, suffix, delimiter=' '):
         ''' add suffix to file name '''
-        name = f'{self.name} {suffix}'
-        return self.swap(name=name)
+        return self.swap(name=delimiter.join((self.name, suffix)))
 
 
     # helper functions adding timestamps to files
