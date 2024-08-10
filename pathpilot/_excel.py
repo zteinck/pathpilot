@@ -716,13 +716,20 @@ class ExcelFile(FileBase):
             if total_row_format is None: total_row_format = 'auto'
             if total_column_format is None: total_column_format = 'auto'
 
+            infer_format = lambda fmt, s: fmt if s.sum() - s.round().sum() == 0 else f'{fmt}_two_decimals'
+
             for k in numeric_columns:
                 if not df[k].isna().all():
                     s = df[k].dropna().abs()
                     if s.max() >= 1000:
-                        data_format[k] = 'commas' if s.sum() - s.round().sum() == 0 else 'commas_two_decimals'
+                        data_format[k] = infer_format('commas', s)
 
-            for k in percent_columns: data_format[k] = 'percent_two_decimals'
+            for k in percent_columns:
+                if not df[k].isna().all():
+                    s = df[k].dropna().abs()
+                    if s[s > 0].min() >= 1: df[k] /= 100
+                    data_format[k] = infer_format('percent', s)
+
             for k in datetime_columns: data_format[k] = 'datetime'
             for k in date_columns: data_format[k] = 'date'
 
