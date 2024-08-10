@@ -259,13 +259,13 @@ class Folder(object):
             def format_date_pattern(x):
                 start, end = x.startswith('('), x.endswith(')')
                 if (start and not end) or (end and not start):
-                    raise ValueError("'date_pattern' is malformed: '{date_pattern}'")
+                    raise ValueError(f"'date_pattern' is malformed: '{date_pattern}'")
                 return x if start and end else f'({x})'
 
 
             supported_errors = ['raise','ignore']
             if errors not in supported_errors:
-                raise ValueError("'errors' argument '{errors}' not recognized. Must be in {supported_errors}")
+                raise ValueError(f"'errors' argument '{errors}' not recognized. Must be in {supported_errors}")
 
             if sort_by is None:
                 sort_by = 'created_date'
