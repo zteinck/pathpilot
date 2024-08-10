@@ -727,7 +727,10 @@ class ExcelFile(FileBase):
             for k in percent_columns:
                 if not df[k].isna().all():
                     s = df[k].dropna().abs()
-                    if s[s > 0].min() >= 1: df[k] /= 100
+                    if s[s > 0].min() >= 1:
+                        df[k] /= 100
+                    else:
+                        s *= 100
                     data_format[k] = infer_format('percent', s)
 
             for k in datetime_columns: data_format[k] = 'datetime'
