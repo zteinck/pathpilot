@@ -276,14 +276,13 @@ class Folder(object):
                         'arguments are not None.')
 
 
-            df = self.meta_data
             kind = self.__class__.__name__.lower()
 
-            if df.empty:
+            if not self.exists:
                 if errors == 'ignore': return
                 raise ValueError(f"no {kind} exist to filter")
 
-            df = df.sort_values(by=sort_by, ascending=ascending)
+            df = self.meta_data.sort_values(by=sort_by, ascending=ascending)
 
             if ext is not None:
                 if kind == 'folders':
