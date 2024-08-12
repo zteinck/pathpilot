@@ -47,6 +47,8 @@ class FileBase(object):
         file name (does not include the file extension)
     extension | ext (property) : str
         the file extension (does not include the period)
+    read_only : bool
+        if True, creating or deleting files is disabled.
     '''
 
     #╭-------------------------------------------------------------------------╮
@@ -211,7 +213,7 @@ class FileBase(object):
     @property
     def folder(self):
         ''' returns folder the file is currently in as a Folder object '''
-        return Folder(self.directory)
+        return Folder(self.directory, read_only=self.read_only)
 
 
     @property
