@@ -9,7 +9,8 @@ from iterlab import natural_sort, to_iter
 from cachegrab import sha256
 
 from ._file import FileBase
-from .utils import purge_whitespace, get_size_label
+from .decorators import purge_whitespace
+from .utils import get_size_label
 
 
 
@@ -135,7 +136,8 @@ class ExcelFile(FileBase):
         row = int(row) - 1
 
         if row < 0 or col < 0:
-            raise ValueError(f"invalid start_cell argument {start_cell}. Zero-based indices are not allowed.")
+            raise ValueError(f"invalid start_cell argument {start_cell}. "
+                              "Zero-based indices are not allowed.")
 
         return col, row
 
@@ -159,6 +161,12 @@ class ExcelFile(FileBase):
     def sheet_names(self):
         ''' list of the actual sheet names '''
         return [sheet.name for sheet in self.sheets]
+
+
+    @property
+    def sheet_name_map(self):
+        ''' dictionary mapping user's worksheet names to their truncated counterparts '''
+        return {k: v.name for k, v in self.sheet_cache.items()}
 
 
     @property
@@ -330,12 +338,8 @@ class ExcelFile(FileBase):
 
     @purge_whitespace
     def read(self, **kwargs):
-        df = pd.read_excel(
-            io=self.path,
-            keep_default_na=False,
-            **kwargs
-            )
-        return df
+        kwargs.setdefault('keep_default_na', False)
+        return pd.read_excel(self.path, **kwargs)
 
 
 
@@ -399,7 +403,18 @@ class ExcelFile(FileBase):
             self.page += 1
             name = f'{self.page} - {name}'
 
-        name = name[:31] # Excel has a 31 character limit
+        # Excel has a 31 character limit
+        char_limit = 31
+        name = name[:char_limit]
+
+        # ensure truncated sheet names are unique
+        sheet_names = set(self.sheet_names)
+
+        counter = 2
+        while name in sheet_names:
+            index = char_limit - len(str(int(counter)))
+            name = f'{name[:index]}{counter}'
+            counter += 1
 
         self.sheet_cache[key] = self.workbook.add_worksheet(name)
         self.active_sheet = key
