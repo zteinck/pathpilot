@@ -4,33 +4,8 @@ import math
 import os
 import datetime
 import inspect
-import numpy as np
 from clockwork import Date
 
-
-
-#╭-------------------------------------------------------------------------╮
-#| Classes                                                                 |
-#╰-------------------------------------------------------------------------╯
-
-class ReadOnlyError(Exception):
-
-    def __init__(self, message=None):
-        super().__init__(message or 'cannot perform this action in read-only mode')
-
-
-
-#╭-------------------------------------------------------------------------╮
-#| Functions                                                               |
-#╰-------------------------------------------------------------------------╯
-
-def check_read_only(func):
-
-    def wrapper(self, *args, **kwargs):
-        if self.read_only: raise ReadOnlyError
-        return func(self, *args, **kwargs)
-
-    return wrapper
 
 
 def split_extension(x):
@@ -168,45 +143,6 @@ def backup_folder(origin, destination, overwrite=True, shallow=True, verbose=Tru
             if not os.path.exists(to_folder):
                 os.mkdir(to_folder)
                 if verbose: print(f'BackingUp: {text}')
-
-
-def purge_whitespace(func):
-    ''' wrapper function that purges unwanted whitespace from a DataFrame '''
-
-    def wrapper(*args, **kwargs):
-
-        def strip_or_skip(x):
-            try:
-                x = x.strip()
-                if x == '': return np.nan
-            except:
-                pass
-            return x
-
-        df = func(*args, **kwargs)
-
-        # clean column names by trimming leading/trailing whitespace and removing new lines and consecutive spaces
-        df.rename(columns={k: ' '.join(k.split()) for k in df.columns if isinstance(k, str)}, inplace=True)
-
-        # replace None with np.nan
-        for k in df.columns:
-            try:
-                df[k] = df[k].fillna(np.nan)
-            except:
-                pass
-
-        # trim leading/trailing whitespace and replace whitespace-only values with NaN
-        for k in df.select_dtypes(include=['object']).columns:
-            # df[k] = df[k].replace(to_replace=r'^\s*$', value=np.nan, regex=True)
-
-            # using the vectorized string method str.strip() is faster but object-type columns can have mixed data types
-            df[k] = df[k].apply(strip_or_skip) #.str.strip()
-
-        # df.replace(r'^\s*$', np.nan, regex=True, inplace=True)
-
-        return df
-
-    return wrapper
 
 
 def timestamp_to_date(func):
