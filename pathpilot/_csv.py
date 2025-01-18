@@ -1,7 +1,7 @@
 import pandas as pd
 
 from ._file import FileBase
-from .utils import purge_whitespace
+from .decorators import purge_whitespace
 
 
 
@@ -13,13 +13,9 @@ class CSVFile(FileBase):
 
     @purge_whitespace
     def read(self, **kwargs):
-        df = pd.read_csv(
-            self.path,
-            encoding='ISO-8859-1',
-            keep_default_na=False,
-            **kwargs
-            )
-        return df
+        kwargs.setdefault('encoding', 'ISO-8859-1')
+        kwargs.setdefault('keep_default_na', False)
+        return pd.read_csv(self.path, **kwargs)
 
 
     def _save(self, obj, **kwargs):
