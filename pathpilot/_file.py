@@ -14,10 +14,11 @@ from clockwork import (
     Date,
     )
 
+from .decorators import check_read_only
+from .exceptions import ReadOnlyError
+
 from .utils import (
     get_size_label,
-    check_read_only,
-    ReadOnlyError,
     trifurcate,
     is_file,
     get_created_date,
@@ -90,15 +91,18 @@ class FileBase(object):
                 Parameters
                 ------------
                 destination : str | object
-                    File object or string file path. If Folder, then file is moved to that folder.
+                    File object or string file path. If Folder, then file is moved
+                    to that folder.
                 overwrite : bool
-                    if True, if the destination file already exists, it will be overwritten otherwise behavior
-                             is determined by the raise_on_overwrite arg.
+                    if True, if the destination file already exists, it will be
+                    overwritten otherwise behavior is determined by raise_on_overwrite.
                     If False, the destination file is returned.
                 raise_on_exist : bool
-                    if True, if the file to be copied does not exist then an exception is raised.
+                    if True, if the file to be copied does not exist then an exception
+                    is raised.
                 raise_on_overwrite : bool
-                    if True and overwrite is False, then an exception will be raised if the destination file
+                    if True and overwrite is False, then an exception will be raised if
+                    the destination file
                     already exists.
                 '''
 
@@ -119,7 +123,8 @@ class FileBase(object):
                     else:
                         return f
 
-                # this is below overwite logic so so that self.require() is able to return existing file before raising if exists
+                # this is below overwite logic so so that self.require() is able to return existing
+                # file before raising if exists
                 if raise_on_exist and not self.exists:
                     raise Exception(f"Copy failed. File does not exist:\n'{self}'")
 
@@ -139,13 +144,14 @@ class FileBase(object):
             args : tuple
                 arguments are only passed to the respective clockwork function
             kwargs : dict
-                keyword arguments are passed to the respective clockwork function with the exception of
-                'loc' and 'encase':
+                keyword arguments are passed to the respective clockwork function
+                with the exception of 'loc' and 'encase':
 
-                    loc : str
-                        the location where you want the timestamp. Supported values are 'prefix' and 'suffix'
-                    encase : bool
-                        if True, the timestamp will be encased in paranthesis
+                loc : str
+                    the location where you want the timestamp.
+                    Supported values are 'prefix' and 'suffix'
+                encase : bool
+                    if True, the timestamp is encased in paranthesis
             '''
 
             def wrapper(self, *args, **kwargs):
@@ -154,6 +160,29 @@ class FileBase(object):
                 timestamp = func(self, *args, **kwargs)
                 if encase: timestamp = f'({timestamp})'
                 return getattr(self, loc)(timestamp)
+
+            return wrapper
+
+
+        @staticmethod
+        def add_affix(func):
+            '''
+            Parameters
+            ------------
+            text : str
+                text to affix at the beginning or end of the file name
+            delimiter : str
+                character(s) separating the file name and affix
+            encase : bool
+                if True, the affix is encased in parenthesis
+            '''
+
+            def wrapper(self, text, delimiter=' ', encase=False):
+                kind = func.__name__.split('_')[-1]
+                if encase: text = f'({text})'
+                parts = [text, self.name]
+                if kind == 'suffix': parts.reverse()
+                return self.swap(name=delimiter.join(parts))
 
             return wrapper
 
@@ -418,14 +447,14 @@ class FileBase(object):
         return self.spawn(self.path)
 
 
-    def prefix(self, prefix, delimiter=' '):
+    @Decorators.add_affix
+    def prefix():
         ''' add prefix to file name '''
-        return self.swap(name=delimiter.join((prefix, self.name)))
 
 
-    def suffix(self, suffix, delimiter=' '):
+    @Decorators.add_affix
+    def suffix():
         ''' add suffix to file name '''
-        return self.swap(name=delimiter.join((self.name, suffix)))
 
 
     # helper functions adding timestamps to files
