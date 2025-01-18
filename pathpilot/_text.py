@@ -12,7 +12,6 @@ class TextFile(FileBase):
         encoding = 'utf-8' if mode != 'rb' else None
         with open(self.path, mode=mode, encoding=encoding) as file:
             text = file.read()
-        file.close()
         return text
 
 
@@ -20,4 +19,3 @@ class TextFile(FileBase):
         encoding = 'utf-8' if mode != 'wb' else None
         with open(self.path, mode=mode, encoding=encoding) as file:
             file.write(text)
-        file.close()
