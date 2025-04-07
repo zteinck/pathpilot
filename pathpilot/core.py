@@ -30,7 +30,7 @@ extension_mapping = {
 #╰-------------------------------------------------------------------------╯
 
 def File(f, **kwargs):
-    ''' assigns new file instances to the correct class polymorphism '''
+    ''' assigns new file instances to the correct subclass '''
     extension = trifurcate(f)[-1]
     out = extension_mapping.get(extension, FileBase)(f, **kwargs)
     return out

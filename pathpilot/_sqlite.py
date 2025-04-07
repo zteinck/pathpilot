@@ -8,6 +8,7 @@ from ._file import FileBase
 
 
 
+
 class SQLiteFile(FileBase):
 
     #╭-------------------------------------------------------------------------╮
@@ -105,8 +106,17 @@ class SQLiteFile(FileBase):
 
 
     def data_types(self, tbl_name):
-        mapping = {'NULL': None, 'INTEGER': int, 'REAL': float, 'TEXT': str, 'BLOB': object, 'INT': int}
-        return {k.lower(): mapping[v] for k,v in self.table_info(tbl_name)[['name','type']].values}
+        dtype_map = {
+            'NULL': None,
+            'INTEGER': int,
+            'REAL': float,
+            'TEXT': str,
+            'BLOB': object,
+            'INT': int
+            }
+
+        return {k.lower(): dtype_map[v] for k, v in
+                self.table_info(tbl_name)[['name','type']].values}
 
 
     def drop(self, tbl_name):
@@ -130,7 +140,9 @@ class SQLiteFile(FileBase):
 
 
     def column_to_set(self, tbl_name, col_name):
-        return set(x[0] for x in self.c.execute("SELECT DISTINCT {1} FROM {0}".format(tbl_name,col_name)).fetchall())
+        return set(x[0] for x in self.c.execute(
+            "SELECT DISTINCT {1} FROM {0}".format(tbl_name, col_name)
+            ).fetchall())
 
 
     def execute(self, sql, params=()):
@@ -155,21 +167,36 @@ class SQLiteFile(FileBase):
         self.conn.commit()
 
 
-    def df_to_table(self, tbl_name, df, chunksize=0, clear_tbl=False, where_cols=None, where_logic=''):
-        ''' performs bulk insert of dataframe; bulk update occurs if where_cols argument is passed '''
+    def df_to_table(
+            self,
+            tbl_name,
+            df,
+            chunksize=0,
+            clear_tbl=False,
+            where_cols=None,
+            where_logic=''
+            ):
 
         def to_table(df):
             payload = self.format_payload(tbl_name, col_names, df.values)
             self.c.executemany(sql, payload)
             self.conn.commit()
 
-        if clear_tbl: self.clear(tbl_name)
+        if clear_tbl:
+            self.clear(tbl_name)
 
-        if list(filter(None, list(df.index.names))): df.reset_index(inplace=True)
+        if list(filter(None, list(df.index.names))):
+            df.reset_index(inplace=True)
+
         df.rename(columns={x: x.lower() for x in df.columns}, inplace=True)
-        col_names = [x for x in lower_iter(self.columns(tbl_name)) if x in set(list(df.columns))]
+        col_names = [x for x in lower_iter(self.columns(tbl_name))
+                     if x in set(list(df.columns))]
         df = df[col_names]
-        if df.empty: raise RuntimeError('Dataframe and %s table have no columns in common' % tbl_name)
+
+        if df.empty:
+            raise ValueError(
+                f'Dataframe and {tbl_name} table have no columns in common'
+                )
 
         if where_cols:
             where_cols = lower_iter(to_iter(where_cols))
@@ -182,7 +209,8 @@ class SQLiteFile(FileBase):
 
         if chunksize:
             df = df.groupby(np.arange(len(df)) // chunksize)
-            for key,chunk in df: to_table(chunk)
+            for key, chunk in df:
+                to_table(chunk)
         else:
             to_table(df)
 
@@ -190,17 +218,16 @@ class SQLiteFile(FileBase):
     def copy_as_temp(self, target_name, temp_name=None, index=None):
         ''' creates temporary table based on permanent table '''
         temp_name = temp_name or target_name
-        sql = 'CREATE TEMP TABLE {0} AS SELECT * FROM {1} LIMIT 0;'.format(temp_name,target_name)
+        sql = f'CREATE TEMP TABLE {temp_name} AS SELECT * FROM {target_name} LIMIT 0;'
         self.c.execute(sql)
         self.conn.commit()
+
         if index:
-            sql = 'CREATE INDEX temp.idx ON {0}({1})'.format(temp_name,','.join(to_iter(index)))
+            sql = f"CREATE INDEX temp.idx ON {temp_name}({', '.join(to_iter(index))})"
             self.c.execute(sql)
             self.conn.commit()
 
 
-    def clear_tables(self, warn=True):
-        response = input(f'Clear all {self.name}.sqlite tables (y/n)? this action cannot be undone: ') if warn else 'y'
-        if response.lower() == 'y':
-            for x in self.tables():
-                self.clear(x)
+    def clear_tables(self):
+        for table in self.tables():
+            self.clear(table)

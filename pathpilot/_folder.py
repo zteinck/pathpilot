@@ -4,6 +4,7 @@ import os
 import pandas as pd
 from iterlab import natural_sort
 from cachegrab import sha256
+from oddments.decorators import validate_setter
 
 from clockwork import (
     quarter_end,
@@ -31,6 +32,7 @@ from .utils import (
 
 
 
+
 class Folder(object):
     '''
     Description
@@ -49,9 +51,9 @@ class Folder(object):
 
     Instance Attributes
     --------------------
-    path : str
+    _path : str
         string representation of the current folder
-    read_only : bool
+    _read_only : bool
         if True, creating or deleting folders is disabled.
     _subfolder_cache : dict
         Cache of subfolders accessed by referencing attributes that do not exist.
@@ -73,17 +75,16 @@ class Folder(object):
     def __init__(self, f=None, read_only=True):
         '''
         Parameters
-        ----------
+        ------------
         f : str
             Folder path. if None, path will be the current working directory.
             See get_cwd documentation for more information.
         read_only : bool
             see above
         '''
-        self.path = trifurcate(get_cwd() if f is None else f)[0]
-        self.read_only = read_only
+        self._path = trifurcate(get_cwd() if f is None else f)[0]
         self._subfolder_cache = {}
-        if not read_only: self.create()
+        self.read_only = read_only
 
 
     #╭-------------------------------------------------------------------------╮
@@ -428,26 +429,13 @@ class Folder(object):
                 file.delete()
 
 
-
     #╭-------------------------------------------------------------------------╮
     #| Class Methods                                                           |
     #╰-------------------------------------------------------------------------╯
 
     @classmethod
-    def spawn(cls, *args, **kwargs):
-        '''
-        For functions that return new instances, this preserves the class.
-        For example, return Folder(f) would return an instance of the parent
-        class which you would not want if using a class that inherits from
-        Folder '''
-        return cls(*args, **kwargs)
-
-
-    @classmethod
-    def spawn_file(cls, f, *args, **kwargs):
-        ''' initialize a new file object. You cannot just do self.spawn_file(f) because
-        if passing to a function that expects one argument it also passes self '''
-        return cls.factory(f, *args, **kwargs)
+    def _spawn_file(cls, *args, **kwargs):
+        return cls.factory(*args, **kwargs)
 
 
     @classmethod
@@ -458,6 +446,23 @@ class Folder(object):
     #╭-------------------------------------------------------------------------╮
     #| Properties                                                              |
     #╰-------------------------------------------------------------------------╯
+
+    @property
+    def path(self):
+        return self._path[:]
+
+
+    @property
+    def read_only(self):
+        return self._read_only
+
+
+    @read_only.setter
+    @validate_setter(types=bool, call_func=True)
+    def read_only(self, value):
+        self._read_only = value
+        if not value: self.create()
+
 
     @property
     def empty(self):
@@ -498,12 +503,7 @@ class Folder(object):
         if len(hierarchy) == 1:
             raise ValueError(f"'{self}' does not have a parent directory")
 
-        parent = self.spawn(
-            '/'.join(hierarchy[:-1]) + '/',
-            read_only=self.read_only
-            )
-
-        return parent
+        return self.spawn('/'.join(hierarchy[:-1]) + '/')
 
 
     @property
@@ -646,43 +646,55 @@ class Folder(object):
             Folder object
         '''
 
-        if self.troubleshoot: print('__getattr__ ► name =', name)
+        if self.troubleshoot:
+            print('__getattr__ ► name =', name)
+
         key = self._convert_name_to_cache_key(name)
 
         # check if the subfolder being referenced was already cached
         if key in self._subfolder_cache:
-            if self.troubleshoot: print("found key = '{key}' in cache")
+            if self.troubleshoot:
+                print("found key = '{key}' in cache")
             return self._subfolder_cache[key]
 
         # check if the subfolder being referenced already exists
         for folder in self.folders:
             if key == folder.cache_key:
-                if self.troubleshoot: print(f"found existing subfolder = {folder.name}")
+                if self.troubleshoot:
+                    print(f"found existing subfolder = {folder.name}")
                 self._subfolder_cache[key] = folder
                 return self._subfolder_cache[key]
 
         # cache subfolder that does not exist yet (it will now if read_only=False)
-        if self.troubleshoot: print(f"could not find subfolder = '{name}'")
+        if self.troubleshoot:
+            print(f"could not find subfolder = '{name}'")
+
         self._subfolder_cache[key] = self.join(
-            name.replace('_', ' ').title())
+            name.replace('_', ' ').title()
+            )
 
         return self._subfolder_cache[key]
-
 
 
     #╭-------------------------------------------------------------------------╮
     #| Instance Methods                                                        |
     #╰-------------------------------------------------------------------------╯
 
+    def spawn(self, *args, **kwargs):
+        kwargs.setdefault('read_only', self.read_only)
+        return self.__class__(*args, **kwargs)
+
+
+    def spawn_file(self, *args, **kwargs):
+        kwargs.setdefault('read_only', self.read_only)
+        return self._spawn_file(*args, **kwargs)
+
+
     def walk(self):
         ''' iterates through every file in the folder and subfolders '''
         for dir_folder, dir_names, file_names in os.walk(self.path):
             for file_name in self.sort(file_names):
-                file = self.spawn_file(
-                    f=os.path.join(dir_folder, file_name),
-                    read_only=self.read_only
-                    )
-                yield file
+                yield self.spawn_file(os.path.join(dir_folder, file_name))
 
 
     def _convert_name_to_cache_key(self, key):
@@ -755,11 +767,7 @@ class Folder(object):
         out : Folder | File
             folder or file object
         '''
-
         self.validate_join_args(args)
-
-        if 'read_only' not in kwargs:
-            kwargs['read_only'] = self.read_only
 
         f = trifurcate_and_join(self.path + '/'.join(args))
 
@@ -773,14 +781,14 @@ class Folder(object):
             return self.spawn(f, **kwargs)
 
         else:
-            raise TypeError(f'Could not infer object. Join result {f} is neither a file or folder.')
+            raise TypeError(f'Join result is neither file nor folder: {f}')
 
 
     @check_read_only
     def create(self):
         ''' Creates the instance folder if it does not already exist.
         Missing parents in the hierarchy are created as well because
-        accessing self.parent calls calls this method as well. '''
+        accessing self.parent calls this method as well. '''
 
         if not self.exists and self.parent.exists:
             create_folder(self.path)
@@ -795,7 +803,7 @@ class Folder(object):
 
     @check_read_only
     def clear(self):
-        '''  '''
+        ''' deletes folder to clear it then immediately recreates it '''
         self.delete()
         self.create()
 
@@ -841,22 +849,36 @@ class Folder(object):
             err_msg = error_template % index
 
             if not isinstance(arg, str):
-                raise TypeError(f'{err_msg} Arg is of type {type(arg)}, but all args should be strings.')
+                raise TypeError(
+                    f'{err_msg} Arg is of type {type(arg)}, but all args should be strings.'
+                    )
 
             if arg == '.':
-                raise ValueError(f"{err_msg} Single period arguments ('.') are not allowed. {period_rules}")
+                raise ValueError(
+                    f"{err_msg} Single period arguments ('.') are not allowed. {period_rules}"
+                    )
 
             if arg.strip() == '':
-                raise ValueError(f"{err_msg} Empty or whitespace-only arguments are not allowed.")
+                raise ValueError(
+                    f"{err_msg} Empty or whitespace-only arguments are not allowed."
+                    )
 
             if '..' in arg:
-                raise ValueError(f"{err_msg} Consecutive periods are not allowed. {period_rules}")
+                raise ValueError(
+                    f"{err_msg} Consecutive periods are not allowed. {period_rules}"
+                    )
 
             if arg[-1] == '.':
-                raise ValueError(f"{err_msg} Arguments may not end in with a period ('.'). {period_rules}")
+                raise ValueError(
+                    f"{err_msg} Arguments may not end in with a period ('.'). {period_rules}"
+                    )
 
             if arg != arg.strip():
-                raise ValueError(f"{err_msg} Argument ('{arg}') contains leading or trailing whitespace.")
+                raise ValueError(
+                    f"{err_msg} Argument ('{arg}') contains leading or trailing whitespace."
+                    )
 
             if any(x in arg for x in [':','*','?','"','<','>']):
-                raise ValueError(f"{err_msg} Argument ('{arg}') contains a reserved character.")
+                raise ValueError(
+                    f"{err_msg} Argument ('{arg}') contains a reserved character."
+                    )

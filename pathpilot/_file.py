@@ -5,6 +5,7 @@ import os
 import pandas as pd
 import numpy as np
 from cachegrab import sha256
+from oddments.decorators import validate_setter
 
 from clockwork import (
     quarter_end,
@@ -29,26 +30,27 @@ from ._folder import Folder
 
 
 
+
 class FileBase(object):
     '''
     Description
     --------------------
-    File object
+    File base class
 
     Class Attributes
     --------------------
     factory : func
-        function that assigns new file instances to the correct class polymorphism
+        Function that assigns new file instances to the correct subclass.
 
     Instance Attributes
     --------------------
     directory : str
-        name of folder in which the file currently resides
+        Name of folder in which the file currently resides.
     name : str
-        file name (does not include the file extension)
+        File name (does not include the file extension).
     extension | ext (property) : str
-        the file extension (does not include the period)
-    read_only : bool
+        The file extension (does not include the period).
+    _read_only : bool
         if True, creating or deleting files is disabled.
     '''
 
@@ -59,12 +61,12 @@ class FileBase(object):
     def __init__(self, f, read_only=False):
         '''
         Parameters
-        ----------
-        f : str | File obj
+        ------------
+        f : str | FileBase instance
             file folder
         '''
         if not is_file(f):
-            raise ValueError(f'Passed argument is not a file (f={f})')
+            raise ValueError(f"'f' argument is not a file: {f}")
 
         self.directory, self.name, self.extension = trifurcate(f)
         self.read_only = read_only
@@ -91,42 +93,48 @@ class FileBase(object):
                 Parameters
                 ------------
                 destination : str | object
-                    File object or string file path. If Folder, then file is moved
-                    to that folder.
+                    File object or string file path. If Folder, then file is
+                    moved to that folder.
                 overwrite : bool
                     if True, if the destination file already exists, it will be
-                    overwritten otherwise behavior is determined by raise_on_overwrite.
+                             overwritten otherwise behavior is determined by
+                             raise_on_overwrite.
                     If False, the destination file is returned.
                 raise_on_exist : bool
-                    if True, if the file to be copied does not exist then an exception
-                    is raised.
+                    if True, if the file to be copied does not exist then an
+                    exception is raised.
                 raise_on_overwrite : bool
-                    if True and overwrite is False, then an exception will be raised if
-                    the destination file
-                    already exists.
+                    if True and overwrite is False, then an exception will be
+                    raised if the destination file already exists.
                 '''
 
-                f = destination.join(self.full_name) if isinstance(destination, Folder) \
+                f = destination.join(self.full_name) \
+                    if isinstance(destination, Folder) \
                     else self.trifurcate_and_fill(destination)
 
                 if self.read_only and func.__name__ != 'copy':
                     raise ReadOnlyError
 
                 if f.read_only:
-                    raise ReadOnlyError(f"Destination is in read-only mode: {destination.path}")
-
-                # print(f'copying {self.path} -> {f}...')
+                    raise ReadOnlyError(
+                        f"Destination is in read-only mode: {destination.path}"
+                        )
 
                 if not overwrite and f.exists:
                     if raise_on_overwrite:
-                        raise Exception(f"Copy failed. File already exists in destination:\n'{f.full_name}'")
+                        raise ValueError(
+                            "Copy failed. File already exists in destination:\n"
+                            f"'{f.full_name}'"
+                            )
                     else:
                         return f
 
-                # this is below overwite logic so so that self.require() is able to return existing
-                # file before raising if exists
+                # this is below overwite logic so so that self.require() is
+                # able to return existing file before raising if exists
                 if raise_on_exist and not self.exists:
-                    raise Exception(f"Copy failed. File does not exist:\n'{self}'")
+                    raise FileNotFoundError(
+                        f"Copy failed. File does not exist:\n'{self}'"
+                        )
 
                 if self.exists:
                     func(self, f)
@@ -192,22 +200,50 @@ class FileBase(object):
     #╰-------------------------------------------------------------------------╯
 
     @classmethod
-    def spawn(cls, *args, **kwargs):
+    def _spawn(cls, *args, **kwargs):
         '''
-        For functions that return new instances, this ensures the new instance
-        is of the correct class polymorphism. For example, if a csv file gets
-        changed to an excel file the sorting hat function will correctly change
-        the type from CSVFile to ExcelFileBase. The class polymorphism can set
-        factory = None if the type needs to be retained no matter what. For
-        example, CryptoFile should always spawn more CryptoFiles regardless of
-        the file extension.
+        Description
+        ------------
+        This method ensures that functions returning new instances create objects
+        of the correct subclass. For instance, if a CSVFile instance is converted
+        to an Excel file, this method guarantees that the returned instance is
+        an ExcelFile object. If subclass typing must be preserved regardless of
+        changes, the subclass can set the factory to None. For example, a
+        CryptoFile should always create instances of CryptoFile even if the
+        file extension is changed.
+
+        Note: This must be at the class level since calling self.factory() at
+        the instance level passes self as the first argument.
+
+        Parameters
+        ------------
+        args : tuple
+            arguments passed to factory
+        kwargs : dict
+            keyword arguments passed to factory
+
+        Returns
+        ------------
+        file : FileBase subclass instance
+            spawned file instance
         '''
-        return (cls.factory if cls.factory is not None else cls)(*args, **kwargs)
+        return (cls if cls.factory is None else cls.factory)(*args, **kwargs)
 
 
     #╭-------------------------------------------------------------------------╮
     #| Properties                                                              |
     #╰-------------------------------------------------------------------------╯
+
+    @property
+    def read_only(self):
+        return self._read_only
+
+
+    @read_only.setter
+    @validate_setter(types=bool)
+    def read_only():
+        pass
+
 
     @property
     def ext(self):
@@ -223,7 +259,7 @@ class FileBase(object):
 
     @property
     def name_ext(self):
-        ''' file name including file extension but exlcuding the folder in string format '''
+        ''' file name including file extension but exlcuding the folder '''
         return self.name + '.' + self.ext
 
 
@@ -327,25 +363,35 @@ class FileBase(object):
 
 
     def __eq__(self, other):
-        f1, f2 = self.path, str(other)
-        return f1 == f2 and filecmp.cmp(f1, f2)
+        a, b = self.path, str(other)
+        return a == b and filecmp.cmp(a, b)
 
 
     def __ne__(self, other):
-        f1, f2 = self.path, str(other)
-        return f1 != f2 or not filecmp.cmp(f1, f2)
+        return not self.__eq__(other)
 
 
     #╭-------------------------------------------------------------------------╮
     #| Instance Methods                                                        |
     #╰-------------------------------------------------------------------------╯
 
+    def spawn(self, *args, **kwargs):
+        kwargs.setdefault('read_only', self.read_only)
+        return self._spawn(*args, **kwargs)
+
+
     def read(self, *args, **kwargs):
-        raise NotImplementedError(f"read function is not supported for files with extension '{self.ext}'")
+        raise NotImplementedError(
+            'read() method is not supported for files with extension: '
+            f"'.{self.ext}'"
+            )
 
 
     def _save(self, *args, **kwargs):
-        raise NotImplementedError("subclass for '.{self.ext}' files must implement _save method.")
+        raise NotImplementedError(
+            'subclass must implement _save() method for files with extension: '
+            f"'.{self.ext}'"
+            )
 
 
     @check_read_only
@@ -362,7 +408,8 @@ class FileBase(object):
     @check_read_only
     def delete(self):
         ''' delete file if it exists '''
-        if self.exists: os.remove(self.path)
+        if self.exists:
+            os.remove(self.path)
 
 
     def open(self):
@@ -379,8 +426,9 @@ class FileBase(object):
 
     @Decorators.move_file
     def rename(self, destination):
-        ''' Renames file. You can essentially use this as a cut and paste if you specify
-            the new directory. You can also change the file extention if you wish '''
+        ''' Renames file. You can essentially use this as a cut and paste if you
+            specify the new directory. You can also change the file extention if
+            you wish '''
         os.rename(self.path, destination.path)
 
 
@@ -410,35 +458,42 @@ class FileBase(object):
     @check_read_only
     def zip(self, name=None, delete_original=False):
         ''' zips a single file '''
-        if not self.exists: raise Exception(f"'{self}' cannot be zipped because it does not exist?")
+        if not self.exists:
+            raise FileNotFoundError(
+                f"Cannot zip file because it does not exist: '{self}'"
+                )
         f = self.trifurcate_and_fill(name or self.path)
         if f.ext != 'zip': f = f.swap(ext='zip')
-        zipfile.ZipFile(f.path, 'w', zipfile.ZIP_DEFLATED).write(self.path, arcname=self.full_name)
-        if delete_original: self.delete()
+        zipfile.ZipFile(f.path, 'w', zipfile.ZIP_DEFLATED)\
+            .write(self.path, arcname=self.full_name)
+        if delete_original:
+            self.delete()
         return f
 
 
     @check_read_only
     def unzip(self, folder=None, delete_original=False):
         ''' unzips file '''
-        if self.ext != 'zip': raise Exception(f"file '{self.name_ext}' is not a zip file")
+        if self.ext != 'zip':
+            raise ValueError(f"file '{self.name_ext}' is not a zip file?")
         folder = self.directory if folder is None else folder
-        with zipfile.ZipFile(self.path, 'r') as f:
-            f.extractall(str(folder))
-        f.close()
-        if delete_original: self.delete()
+        with zipfile.ZipFile(self.path, 'r') as zip_file:
+            zip_file.extractall(str(folder))
+        if delete_original:
+            self.delete()
 
 
     def swap(self, **kwargs):
-        ''' quick way of intitializing a new File with different attribute(s)
-        (e.g. you have a csv file and want an xlsx file of the same name) '''
+        ''' quick way of intitializing a new file with different attribute(s)
+            (e.g. you have a csv file and want an xlsx file of the same name) '''
         alias_map = {'folder': 'directory', 'ext': 'extension'}
         kwargs = {alias_map.get(k, k): v for k, v in kwargs.items()}
         directory, name, extension = [
             str(kwargs.get(k, getattr(self, k)))
-            for k in ['directory','name','extension']]
+            for k in ['directory','name','extension']
+            ]
         if directory[-1] != '/': directory += '/'
-        f = directory + name + '.' + extension.replace('.','')
+        f = directory + name + '.' + extension.replace('.', '')
         return self.spawn(f)
 
 
