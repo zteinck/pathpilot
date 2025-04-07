@@ -5,11 +5,20 @@ from ._file import FileBase
 
 
 
+
 class PickleFile(FileBase):
+
+    #╭-------------------------------------------------------------------------╮
+    #| Initialize Instance                                                     |
+    #╰-------------------------------------------------------------------------╯
 
     def __init__(self, f, **kwargs):
         super().__init__(f, **kwargs)
 
+
+    #╭-------------------------------------------------------------------------╮
+    #| Instance Methods                                                        |
+    #╰-------------------------------------------------------------------------╯
 
     def read(self):
         out = pd.read_pickle(self.path)
@@ -26,4 +35,3 @@ class PickleFile(FileBase):
 
         with open(self.path, 'wb') as file:
             pickle.dump(args, file, **kwargs)
-        file.close()
