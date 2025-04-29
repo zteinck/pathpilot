@@ -1,8 +1,6 @@
 from ._file import FileBase
 
 
-
-
 class TextFile(FileBase):
 
     #╭-------------------------------------------------------------------------╮

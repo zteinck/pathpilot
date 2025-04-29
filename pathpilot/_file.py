@@ -4,8 +4,8 @@ import filecmp
 import os
 import pandas as pd
 import numpy as np
+import oddments as odd
 from cachegrab import sha256
-from oddments.decorators import validate_setter
 
 from clockwork import (
     quarter_end,
@@ -27,8 +27,6 @@ from .utils import (
     )
 
 from ._folder import Folder
-
-
 
 
 class FileBase(object):
@@ -240,7 +238,7 @@ class FileBase(object):
 
 
     @read_only.setter
-    @validate_setter(types=bool)
+    @odd.validate_setter(types=bool)
     def read_only():
         pass
 

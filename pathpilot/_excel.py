@@ -5,15 +5,11 @@ import sys
 import re
 import pandas as pd
 import numpy as np
-from iterlab import natural_sort, to_iter
+import oddments as odd
 from cachegrab import sha256
-from oddments.decorators import validate_setter
 
 from ._file import FileBase
-from .decorators import purge_whitespace
 from .utils import get_size_label
-
-
 
 
 class ExcelFile(FileBase):
@@ -214,7 +210,7 @@ class ExcelFile(FileBase):
 
 
     @active_sheet.setter
-    @validate_setter(types=str, call_func=True)
+    @odd.validate_setter(types=str, call_func=True)
     def active_sheet(self, value):
         if value in self.sheet_cache:
             self._active_sheet = self.sheet_cache[value]
@@ -382,7 +378,7 @@ class ExcelFile(FileBase):
     #| Instance Methods                                                        |
     #╰-------------------------------------------------------------------------╯
 
-    @purge_whitespace
+    @odd.purge_whitespace
     def read(self, **kwargs):
         kwargs.setdefault('keep_default_na', False)
         return pd.read_excel(self.path, **kwargs)
@@ -422,10 +418,10 @@ class ExcelFile(FileBase):
                 sheets = list(args.keys())
                 args = list(args.values())
             else:
-                args = to_iter(args)
+                args = odd.to_iter(args)
 
             if sheets is not None:
-                sheets = to_iter(sheets)
+                sheets = odd.to_iter(sheets)
                 if len(args) != len(sheets):
                     raise ValueError(
                         f"length of 'args' ({len(args)}) != length of 'sheets' "
@@ -871,10 +867,9 @@ class ExcelFile(FileBase):
 
             if total_column_format == 'auto':
                 data_format[total_column_name] = \
-                    self.add_format(
-                        to_iter(data_format.pop(total_column_name, [])) + \
-                        ['bold','left']
-                        )
+                    self.add_format(odd.to_iter(
+                        data_format.pop(total_column_name, [])
+                        ) + ['bold','left'])
             else:
                 if total_column_format:
                     if data_format:
@@ -1098,7 +1093,7 @@ class ExcelFile(FileBase):
                     )
             fmt = dict()
             for k in name: fmt.update(self.formats[k])
-            name = '_'.join(natural_sort(name))
+            name = '_'.join(odd.natural_sort(name))
         else:
             if not isinstance(name, str):
                 raise TypeError(

@@ -4,8 +4,6 @@ import pandas as pd
 from ._file import FileBase
 
 
-
-
 class PickleFile(FileBase):
 
     #╭-------------------------------------------------------------------------╮

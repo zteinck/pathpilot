@@ -2,11 +2,9 @@ import sqlite3
 import os
 import pandas as pd
 import numpy as np
-from iterlab import to_iter, lower_iter
+import oddments as odd
 
 from ._file import FileBase
-
-
 
 
 class SQLiteFile(FileBase):
@@ -37,8 +35,8 @@ class SQLiteFile(FileBase):
     def update_query(tbl_name, update_cols, where_cols, where_logic=''):
         sql = 'UPDATE {0} SET {1} WHERE {2} {3}'.format(
             tbl_name,
-            ', '.join('[%s] = ?' % x for x in to_iter(update_cols)),
-            ' AND '.join('[%s] = ?' % x for x in to_iter(where_cols)),
+            ', '.join('[%s] = ?' % x for x in odd.to_iter(update_cols)),
+            ' AND '.join('[%s] = ?' % x for x in odd.to_iter(where_cols)),
             where_logic
             )
         return sql
@@ -48,8 +46,8 @@ class SQLiteFile(FileBase):
     def select_query(tbl_name, select_cols, where_cols, where_logic=''):
         sql = 'SELECT {1} FROM {0} WHERE {2} {3}'.format(
             tbl_name,
-            ', '.join('[%s]' % x for x in to_iter(select_cols)),
-            ' AND '.join('[%s] = ?' % x for x in to_iter(where_cols)),
+            ', '.join('[%s]' % x for x in odd.to_iter(select_cols)),
+            ' AND '.join('[%s] = ?' % x for x in odd.to_iter(where_cols)),
             where_logic
             )
         return sql
@@ -59,7 +57,7 @@ class SQLiteFile(FileBase):
     def delete_query(tbl_name, where_cols, where_logic=''):
         sql = 'DELETE FROM {0} WHERE {1} {2}'.format(
             tbl_name,
-            ' AND '.join('[%s] = ?' % x for x in to_iter(where_cols)),
+            ' AND '.join('[%s] = ?' % x for x in odd.to_iter(where_cols)),
             where_logic
             )
         return sql
@@ -189,7 +187,7 @@ class SQLiteFile(FileBase):
             df.reset_index(inplace=True)
 
         df.rename(columns={x: x.lower() for x in df.columns}, inplace=True)
-        col_names = [x for x in lower_iter(self.columns(tbl_name))
+        col_names = [x for x in odd.lower_iter(self.columns(tbl_name))
                      if x in set(list(df.columns))]
         df = df[col_names]
 
@@ -199,7 +197,7 @@ class SQLiteFile(FileBase):
                 )
 
         if where_cols:
-            where_cols = lower_iter(to_iter(where_cols))
+            where_cols = odd.lower_iter(odd.to_iter(where_cols))
             col_names = [x for x in col_names if x not in where_cols]
             sql = self.update_query(tbl_name, col_names, where_cols, where_logic)
             col_names.extend(where_cols)
@@ -223,7 +221,7 @@ class SQLiteFile(FileBase):
         self.conn.commit()
 
         if index:
-            sql = f"CREATE INDEX temp.idx ON {temp_name}({', '.join(to_iter(index))})"
+            sql = f"CREATE INDEX temp.idx ON {temp_name}({', '.join(odd.to_iter(index))})"
             self.c.execute(sql)
             self.conn.commit()
 

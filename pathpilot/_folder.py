@@ -2,9 +2,8 @@ from functools import cached_property
 import shutil
 import os
 import pandas as pd
-from iterlab import natural_sort
+import oddments as odd
 from cachegrab import sha256
-from oddments.decorators import validate_setter
 
 from clockwork import (
     quarter_end,
@@ -31,8 +30,6 @@ from .utils import (
     )
 
 
-
-
 class Folder(object):
     '''
     Description
@@ -56,15 +53,15 @@ class Folder(object):
     _read_only : bool
         if True, creating or deleting folders is disabled.
     _subfolder_cache : dict
-        Cache of subfolders accessed by referencing attributes that do not exist.
-        See  __getattr__ documentation below for more information.
+        Cache of subfolders accessed by referencing attributes that do not
+        exist. See __getattr__ documentation below for more information.
     '''
 
     #╭-------------------------------------------------------------------------╮
     #| Class Attributes                                                        |
     #╰-------------------------------------------------------------------------╯
 
-    sorter = natural_sort
+    sorter = odd.natural_sort
     troubleshoot = False
 
 
@@ -190,57 +187,62 @@ class Folder(object):
             ):
             r'''
             Description
-            --------------------
+            ------------
             Filter folder objects based on user-defined criteria.
 
             Parameters
-            --------------------
+            ------------
             name_pattern : str
-                If not None, only object names meeting this pattern will be considered candidates.
-                This argument is passed as the pd.Series.str.contains 'pat' argument.
+                If not None, only object names meeting this pattern will be
+                considered candidates. This argument is passed as the
+                pd.Series.str.contains 'pat' argument.
             case : bool
                 if True, 'name_pattern' argument is treated as case sensitive.
                 Passed as pd.Series.str.contains 'case' argument.
             regex
-                if True, 'name_pattern' is evaluated as a regular expression, otherwise it is
-                treated like a literal string. Passed as pd.Series.str.contains 'regex' argument.
+                if True, 'name_pattern' is evaluated as a regular expression,
+                otherwise it is treated like a literal string. Passed as
+                pd.Series.str.contains 'regex' argument.
             date_pattern : str
-                If not None, only those object names containing a timestamp matching this regex
-                pattern will be considered candidates.
+                If not None, only those object names containing a timestamp
+                matching this regex pattern will be considered candidates.
 
                 Example:
-                --------
-                Consider a folder that contains multiple files that include a YYYY-MM-DD timestamp
-                in the name such as '2024-06-23 Budget.xlsx'. In this case you might pass
-                date_pattern=r'\d{4}\-\d{2}\-\d{2}'
+                ------------
+                Consider a folder that contains multiple files that include a
+                YYYY-MM-DD timestamp in the name such as '2024-06-23 Budget.xlsx'.
+                In this case you might pass date_pattern=r'\d{4}\-\d{2}\-\d{2}'
 
             date_format : str
-                Defines the object names' timestamp format (e.g. '%Y-%m-%d'). There are a few
-                scenarios to consider :
-                    • 'date_pattern' is None ➜ an attempt will be made to derive the regex
-                      pattern using 'date_format' as the template.
-                    • 'date_pattern' is not None ➜ 'date_format' is optional but it can be
-                      included if you do not want to rely on pd.to_datetime inferring the format.
+                Defines the object names' timestamp format (e.g. '%Y-%m-%d').
+                There are a few scenarios to consider:
+                    • 'date_pattern' is None ➜ an attempt will be made to derive
+                      the regex pattern using 'date_format' as the template.
+                    • 'date_pattern' is not None ➜ 'date_format' is optional but
+                      it can be included if you do not want to rely on pd.to_datetime
+                      inferring the format.
 
                 Example:
-                --------
-                Dealing with the same example from above, all the following combinations will
-                achieve the same result since the None values being inferred:
+                ------------
+                Dealing with the same example from above, all the following
+                combinations will achieve the same result since the None values
+                being inferred:
                     • date_pattern=r'\d{4}\-\d{2}\-\d{2}', date_format='%Y-%m-%d'
                     • date_pattern=None, date_format='%Y-%m-%d'
                     • date_pattern=r'\d{4}\-\d{2}\-\d{2}', date_format=None
 
             ext : str
-                If not None, only those file objects with this file extension will be considered
-                candidates. This argument may be passed with or without a period and is not case
-                sensitive (e.g. '.txt', 'txt,' '.TXT' are all valid).
+                If not None, only those file objects with this file extension
+                will be considered candidates. This argument may be passed with
+                or without a period and is not case sensitive (e.g. '.txt', 'txt',
+                '.TXT' are all valid).
             index : int
-                If not None, the object at this integer index in the filtered and sorted data
-                is returned.
+                If not None, the object at this integer index in the filtered and
+                sorted data is returned.
             sort_by : str
-                Name of self.meta_data column to sort by. This argument must be None if
-                the 'date_pattern' or 'date_format' arguments are not None. Defaults to
-                the object created date if None.
+                Name of self.meta_data column to sort by. This argument must be None
+                if the 'date_pattern' or 'date_format' arguments are not None. Defaults
+                to the object created date if None.
             ascending : bool
                 If True, data is sorted in ascending order, otherwise, descending order.
                 If the 'date_pattern' or 'date_format' arguments are not None, the sort
@@ -252,31 +254,38 @@ class Folder(object):
                     • 'ignore': None is returned
 
             Returns
-            ----------
+            ------------
             out : pd.DataFrame | Folder | FileBase
-                if 'index' argument is not None, the corresponding file or folder object is
-                returned. Otherwise, the filtered and sorted meta data DataFrame is returned.
+                if 'index' argument is not None, the corresponding file or
+                folder object is returned. Otherwise, the filtered and sorted
+                meta data DataFrame is returned.
             '''
 
             def format_date_pattern(x):
                 start, end = x.startswith('('), x.endswith(')')
                 if (start and not end) or (end and not start):
-                    raise ValueError(f"'date_pattern' is malformed: '{date_pattern}'")
+                    raise ValueError(
+                        "'date_pattern' is malformed: "
+                        f"'{date_pattern}'"
+                        )
                 return x if start and end else f'({x})'
 
 
             supported_errors = ['raise','ignore']
             if errors not in supported_errors:
-                raise ValueError(f"'errors' argument '{errors}' not recognized. Must be in {supported_errors}")
+                raise ValueError(
+                    f"'errors' argument '{errors}' not recognized. "
+                    f"Must be in {supported_errors}"
+                    )
 
             if sort_by is None:
                 sort_by = 'created_date'
             else:
                 if date_format or date_pattern:
                     raise ValueError(
-                        "cannot pass 'sort_by' argument if either 'date_format' or 'date_pattern' "
-                        'arguments are not None.')
-
+                        "cannot pass 'sort_by' argument if either 'date_format' "
+                        "or 'date_pattern' arguments are not None."
+                        )
 
             kind = self.__class__.__name__.lower()
 
@@ -288,7 +297,10 @@ class Folder(object):
 
             if ext is not None:
                 if kind == 'folders':
-                    raise ValueError("cannot pass 'ext' argument when accessing 'folders' property.")
+                    raise ValueError(
+                        "cannot pass 'ext' argument when "
+                        "accessing 'folders' property."
+                        )
                 ext = ext.replace('.', '').lower()
                 df = df[ df['extension'] == ext ]
                 if df.empty:
@@ -296,7 +308,12 @@ class Folder(object):
                     raise ValueError(f"no files with extension '.{ext}' found.")
 
             if name_pattern is not None:
-                df = df[ df['name'].str.contains(pat=name_pattern, case=case, regex=regex) ]
+                df = df[ (df['name'].str.contains(
+                    pat=name_pattern,
+                    case=case,
+                    regex=regex
+                    )) ]
+
                 if df.empty:
                     if errors == 'ignore': return
                     message = [f"no {kind} matching name pattern '{name_pattern}'"]
@@ -309,19 +326,25 @@ class Folder(object):
             if date_pattern is not None:
                 date_pattern = format_date_pattern(date_pattern)
                 s = df['name'].str.extract(pat=date_pattern)
-                if len(s.columns) != 1: raise ValueError('multiple match groups are not supported')
+                if len(s.columns) != 1:
+                    raise ValueError('multiple match groups are not supported')
                 s = s[ s.columns[0] ].rename('name_timestamp')
 
                 if s.isna().all():
                     if errors == 'ignore': return
-                    raise ValueError(f"timestamp extraction failed for pattern: '{date_pattern}'")
+                    raise ValueError(
+                        "timestamp extraction failed for pattern: "
+                        f"'{date_pattern}'"
+                        )
 
                 s = pd.to_datetime(s.dropna(), format=date_format)
                 df = df.join(s, how='inner').sort_values(by=s.name, ascending=ascending)
 
             if index is not None:
                 if not isinstance(index, int):
-                    raise TypeError(f"'index' argument must be an integer, not {type(index)}")
+                    raise TypeError(
+                        f"'index' argument must be an integer, not {type(index)}"
+                        )
                 try:
                     return self.to_dict()[ df.iloc[index].name ]
                 except Exception as error:
@@ -458,7 +481,7 @@ class Folder(object):
 
 
     @read_only.setter
-    @validate_setter(types=bool, call_func=True)
+    @odd.validate_setter(types=bool, call_func=True)
     def read_only(self, value):
         self._read_only = value
         if not value: self.create()
@@ -625,23 +648,24 @@ class Folder(object):
     def __getattr__(self, name):
         '''
         Description
-        --------------------
+        ------------
         Called when an attribute is referenced that does not exist.
-        This implementation treats every non-existing attribute as a reference to a
-        subfolder that may or may not exist. Because attributes can be formatted
-        differently than their extant folder counterparts (e.g. self.my_folder ➜ 'MY FOLDER/')
-        we first need to iterate through the folder's current subfolder names to see if the
-        attribute is a referencing a folder that already exists. After this step, if no
-        matching extant folder was found and read_only is False, the referenced folder
-        will be created automatically.
+        This implementation treats every non-existing attribute as a reference
+        to a subfolder that may or may not exist. Because attributes can be
+        formatted differently than their extant folder counterparts
+        (e.g. self.my_folder ➜ 'MY FOLDER/') we first need to iterate through
+        the folder's current subfolder names to see if the attribute is a
+        referencing a folder that already exists. After this step, if no
+        matching extant folder was found and read_only is False, the referenced
+        folder will be created automatically.
 
         Parameters
-        --------------------
+        ------------
         name : str
             subfolder name
 
         Returns
-        ----------
+        ------------
         folder : Folder
             Folder object
         '''
@@ -810,9 +834,13 @@ class Folder(object):
 
     def copy(self, destination, overwrite=False):
         ''' copy instance folder to another folder '''
-        if destination.read_only: raise ReadOnlyError
+        if destination.read_only:
+            raise ReadOnlyError
         if destination.exists and not overwrite:
-            raise Exception(f"Copy failed. Folder already exists in destination:\n'{destination}'")
+            raise ValueError(
+                "Copy failed. Folder already exists "
+                f"in destination:\n'{destination}'"
+                )
         destination.delete()
         shutil.copytree(self.path, destination.path)
 
@@ -850,35 +878,42 @@ class Folder(object):
 
             if not isinstance(arg, str):
                 raise TypeError(
-                    f'{err_msg} Arg is of type {type(arg)}, but all args should be strings.'
+                    f'{err_msg} Arg is of type {type(arg)}, '
+                    'but all args should be strings.'
                     )
 
             if arg == '.':
                 raise ValueError(
-                    f"{err_msg} Single period arguments ('.') are not allowed. {period_rules}"
+                    f"{err_msg} Single period arguments ('.') "
+                    f"are not allowed. {period_rules}"
                     )
 
             if arg.strip() == '':
                 raise ValueError(
-                    f"{err_msg} Empty or whitespace-only arguments are not allowed."
+                    f"{err_msg} Empty or whitespace-only "
+                    "arguments are not allowed."
                     )
 
             if '..' in arg:
                 raise ValueError(
-                    f"{err_msg} Consecutive periods are not allowed. {period_rules}"
+                    f"{err_msg} Consecutive periods are "
+                    f"not allowed. {period_rules}"
                     )
 
             if arg[-1] == '.':
                 raise ValueError(
-                    f"{err_msg} Arguments may not end in with a period ('.'). {period_rules}"
+                    f"{err_msg} Arguments may not end in "
+                    f"with a period ('.'). {period_rules}"
                     )
 
             if arg != arg.strip():
                 raise ValueError(
-                    f"{err_msg} Argument ('{arg}') contains leading or trailing whitespace."
+                    f"{err_msg} Argument ('{arg}') contains "
+                    "leading or trailing whitespace."
                     )
 
             if any(x in arg for x in [':','*','?','"','<','>']):
                 raise ValueError(
-                    f"{err_msg} Argument ('{arg}') contains a reserved character."
+                    f"{err_msg} Argument ('{arg}') "
+                    "contains a reserved character."
                     )

@@ -6,8 +6,6 @@ from ._file import FileBase
 from .utils import is_file, is_folder
 
 
-
-
 class ZipFile(FileBase):
     '''
     Description

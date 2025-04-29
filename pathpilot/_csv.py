@@ -1,9 +1,7 @@
 import pandas as pd
+import oddments as odd
 
 from ._file import FileBase
-from .decorators import purge_whitespace
-
-
 
 
 class CSVFile(FileBase):
@@ -20,7 +18,7 @@ class CSVFile(FileBase):
     #| Instance Methods                                                        |
     #╰-------------------------------------------------------------------------╯
 
-    @purge_whitespace
+    @odd.purge_whitespace
     def read(self, **kwargs):
         kwargs.setdefault('encoding', 'ISO-8859-1')
         kwargs.setdefault('keep_default_na', False)

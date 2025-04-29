@@ -7,7 +7,6 @@ import inspect
 from clockwork import Date
 
 
-
 def split_extension(x):
     ''' separates file extention from rest of string '''
     dot_index = x.rfind('.')
