@@ -5,28 +5,21 @@ import os
 import pandas as pd
 import numpy as np
 import oddments as odd
+import clockwork as cw
 from cachegrab import sha256
 
-from clockwork import (
-    quarter_end,
-    month_end,
-    day_of_week,
-    year_end,
-    Date,
-    )
+from .._folder import Folder
+from ..decorators import check_read_only
+from ..exceptions import ReadOnlyError
 
-from .decorators import check_read_only
-from .exceptions import ReadOnlyError
-
-from .utils import (
-    get_size_label,
+from ..utils import (
     trifurcate,
     is_file,
     get_created_date,
     get_modified_date,
     )
 
-from ._folder import Folder
+from .utils import get_size_label
 
 
 class FileBase(object):
@@ -513,7 +506,7 @@ class FileBase(object):
     # helper functions adding timestamps to files
     @Decorators.add_timestamp
     def quarter(self, delta=0):
-        return quarter_end(delta=delta).label
+        return cw.quarter_end(delta=delta).label
 
 
     def qtr(self, *args, **kwargs):
@@ -522,21 +515,21 @@ class FileBase(object):
 
     @Decorators.add_timestamp
     def month(self, delta=0):
-        return month_end(delta=delta).ymd
+        return cw.month_end(delta=delta).ymd
 
 
     @Decorators.add_timestamp
     def day(self, weekday, delta=0):
-        return day_of_week(weekday=weekday, delta=delta).ymd
+        return cw.day_of_week(weekday=weekday, delta=delta).ymd
 
 
     @Decorators.add_timestamp
     def year(self, delta=0):
-        return str(year_end(delta=delta).year)
+        return str(cw.year_end(delta=delta).year)
 
 
     @Decorators.add_timestamp
     def timestamp(self, normalize=False, week_offset=0, fmt=None):
-        now = Date(normalize=normalize, week_offset=week_offset)
+        now = cw.Date(normalize=normalize, week_offset=week_offset)
         now = str(now).replace(':','.') if fmt is None else now.str(fmt)
         return now

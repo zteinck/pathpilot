@@ -1,7 +1,7 @@
 import pandas as pd
 import oddments as odd
 
-from ._file import FileBase
+from .base import FileBase
 
 
 class CSVFile(FileBase):

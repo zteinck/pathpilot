@@ -1,12 +1,10 @@
-from ._file import FileBase
-from ._folder import Folder
-from ._excel import ExcelFile
-from ._csv import CSVFile
-from ._pickle import PickleFile
-from ._text import TextFile
-from ._zip import ZipFile
-from ._sqlite import SQLiteFile
-from .utils import trifurcate, get_cwd
+from ._file import *
+from ._folder import *
+
+from .utils import (
+    trifurcate,
+    get_cwd
+    )
 
 
 #╭-------------------------------------------------------------------------╮

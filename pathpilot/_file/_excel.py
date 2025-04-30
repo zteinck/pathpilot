@@ -8,7 +8,7 @@ import numpy as np
 import oddments as odd
 from cachegrab import sha256
 
-from ._file import FileBase
+from .base import FileBase
 from .utils import get_size_label
 
 

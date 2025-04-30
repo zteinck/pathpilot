@@ -1,4 +1,4 @@
-from ._file import FileBase
+from .base import FileBase
 
 
 class TextFile(FileBase):

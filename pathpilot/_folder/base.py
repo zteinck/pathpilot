@@ -5,19 +5,14 @@ import pandas as pd
 import oddments as odd
 from cachegrab import sha256
 
-from clockwork import (
-    quarter_end,
-    month_end,
-    day_of_week,
-    year_end,
-    )
+import clockwork as cw
+from clockwork.utils import \
+    convert_date_format_to_regex
 
-from clockwork.utils import convert_date_format_to_regex
+from ..decorators import check_read_only
+from ..exceptions import ReadOnlyError
 
-from .decorators import check_read_only
-from .exceptions import ReadOnlyError
-
-from .utils import (
+from ..utils import (
     trifurcate,
     trifurcate_and_join,
     is_file,
@@ -25,6 +20,9 @@ from .utils import (
     get_cwd,
     get_created_date,
     get_modified_date,
+    )
+
+from .utils import (
     create_folder,
     delete_folder,
     )
@@ -847,19 +845,19 @@ class Folder(object):
 
     # helper functions adding timestamps to folders
     def quarter(self, delta=0, **kwargs):
-        return self.join(quarter_end(delta=delta).label, **kwargs)
+        return self.join(cw.quarter_end(delta=delta).label, **kwargs)
 
 
     def month(self, delta=0, **kwargs):
-        return self.join(month_end(delta=delta).ymd, **kwargs)
+        return self.join(cw.month_end(delta=delta).ymd, **kwargs)
 
 
     def day(self, weekday, delta=0, **kwargs):
-        return self.join(day_of_week(weekday=weekday, delta=delta).ymd, **kwargs)
+        return self.join(cw.day_of_week(weekday=weekday, delta=delta).ymd, **kwargs)
 
 
     def year(self, delta=0, **kwargs):
-        return self.join(str(year_end(delta=delta).year), **kwargs)
+        return self.join(str(cw.year_end(delta=delta).year), **kwargs)
 
 
     #╭-------------------------------------------------------------------------╮

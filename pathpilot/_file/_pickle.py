@@ -1,7 +1,7 @@
 import pickle
 import pandas as pd
 
-from ._file import FileBase
+from .base import FileBase
 
 
 class PickleFile(FileBase):

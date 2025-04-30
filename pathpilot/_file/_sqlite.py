@@ -4,7 +4,7 @@ import pandas as pd
 import numpy as np
 import oddments as odd
 
-from ._file import FileBase
+from .base import FileBase
 
 
 class SQLiteFile(FileBase):

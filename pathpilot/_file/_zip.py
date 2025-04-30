@@ -1,9 +1,9 @@
 import zipfile
 import shutil
 
-from ._folder import Folder
-from ._file import FileBase
-from .utils import is_file, is_folder
+from .._folder import Folder
+from ..utils import is_file, is_folder
+from .base import FileBase
 
 
 class ZipFile(FileBase):
