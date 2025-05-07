@@ -1,6 +1,7 @@
 from collections import OrderedDict
 from functools import cached_property
 from copy import deepcopy
+import datetime
 import sys
 import re
 import pandas as pd
@@ -68,13 +69,13 @@ class ExcelFile(FileBase):
     #╰-------------------------------------------------------------------------╯
 
     def __init__(
-            self,
-            f,
-            number_tabs=False,
-            verbose=True,
-            troubleshoot=False,
-            **kwargs
-            ):
+        self,
+        f,
+        number_tabs=False,
+        verbose=True,
+        troubleshoot=False,
+        **kwargs
+        ):
         super().__init__(f, **kwargs)
         self.format_cache = dict()
         self.sheet_cache = dict()
@@ -511,7 +512,7 @@ class ExcelFile(FileBase):
                                   of the list/tuple is shorter than the number
                                   of columns then no format is applied to the
                                   remaining columns.
-                • None ➜ no formatting is applied
+                • None ➜ no formatting is applied.
         inverse : bool
             If True, the 2D data is inverted such that each sub-list is treated
             as column data as opposed to row data under the default behavior.
@@ -555,10 +556,14 @@ class ExcelFile(FileBase):
             updates = dict()
 
             if outer_border:
-                if col == 0: updates['left'] = 1
-                if col == n_cols - 1: updates['right'] = 1
-                if row == 0: updates['top'] = 1
-                if row == n_rows - 1: updates['bottom'] = 1
+                if col == 0:
+                    updates['left'] = 1
+                if col == n_cols - 1:
+                    updates['right'] = 1
+                if row == 0:
+                    updates['top'] = 1
+                if row == n_rows - 1:
+                    updates['bottom'] = 1
                 fmt.update(updates)
 
             return self.get_format(fmt)
@@ -630,6 +635,7 @@ class ExcelFile(FileBase):
         header_format='pandas_header',
         data_format='auto',
         column_widths='auto',
+        date_format=None,
         normalize=True,
         autofilter=False,
         raise_on_empty=True,
@@ -642,10 +648,10 @@ class ExcelFile(FileBase):
         '''
         Description
         ------------
-        Writes a DataFrame to an Excel worksheet. This function is a superior
-        alternative to df.to_excel() because it does not share the same limitations
-        such as not being able format cells that already have a format including
-        the index, headers, and cells that contain dates or datetimes.
+        Writes a DataFrame to an Excel worksheet. This is an alternative to df.to_excel()
+        that addresses some of its limitations such as not being able format cells that
+        already have a format including the index, headers, and cells that contain dates
+        or datetimes.
 
         Parameters
         ------------
@@ -684,6 +690,14 @@ class ExcelFile(FileBase):
             • dict ➜ dictionary where keys are DataFrame column names and values
                            are column widths. Any column names excluded from the
                            dictionary will not have their widths set.
+        date_format : None | str | dict
+            Defines how date-like columns are parsed when data_format='auto'
+            (e.g. '%Y-%m-%d'). Options include:
+            • None ➜ format is inferred.
+            • str ➜ used for all date-like columns.
+            • dict ➜ dictionary where keys are DataFrame column names and values
+                      are formats. Any column names excluded from the dictionary
+                      default to None.
         normalize : bool
             if True, any date columns where the hours, minutes, seconds,
                      microseconds are all set to zero (midnight) will be converted
@@ -714,35 +728,33 @@ class ExcelFile(FileBase):
         None
         '''
 
-        # Type housekeeping
-        if isinstance(df, pd.DataFrame):
-            df = df.copy(deep=True)
-        elif isinstance(df, pd.Series):
-            df = df.to_frame()
-        else:
-            raise TypeError(f"'df' argument type {type(df)} not supported.")
+        df = odd.coerce_dataframe(df)
+
+        odd.validate_value(
+            value=date_format,
+            attr='date_format',
+            types=(str, dict),
+            none_ok=True
+            )
 
         # kwargs housekeeping
-        if kwargs.get('inverse'): raise NotImplementedError
+        if kwargs.get('inverse'):
+            raise NotImplementedError
 
         # Reset index
-        if list(filter(None, list(df.index.names))): df.reset_index(inplace=True)
+        if odd.get_index_names(df):
+            df.reset_index(inplace=True)
 
         # Check if empty
         if df.empty:
             if raise_on_empty:
                 raise ValueError("'df' argument cannot be empty.")
-            if not df.columns.tolist():
+            if len(df.columns) == 0:
                 raise ValueError("'df' argument must have an index or columns")
             total_row, total_column = False, False
 
         # Check for duplicate column names
-        s = df.columns.value_counts()
-        dupes = s[ s > 1 ].to_frame()
-        if len(dupes) > 0:
-            raise ValueError(
-                f"'df' argument cannot have duplicate column names: \n\n{dupes}\n"
-                )
+        odd.verify_no_duplicates(df=df, attr='columns')
 
         # Add a total column to dataframe
         if total_column:
@@ -763,28 +775,15 @@ class ExcelFile(FileBase):
 
         numeric_columns -= percent_columns
 
-        datelike_columns = set(df.select_dtypes(include=[np.datetime64]).columns.tolist())
+        datelike_columns = set(
+            df.select_dtypes(include=[np.datetime64]).columns.tolist()
+            )
 
         for k in df.columns:
             if isinstance(k, str) and \
-               (any(x in k.lower() for x in ('date','time')) or k.lower()[-2:] == 'dt') and \
-               str(df[k].dtype) != 'timedelta64[ns]':
+            odd.column_name_is_datelike(k) and \
+            str(df[k].dtype) != 'timedelta64[ns]':
                 datelike_columns.add(k)
-
-        date_columns, datetime_columns = [], []
-        for k in list(datelike_columns):
-            if not np.issubdtype(df[k].dtype, np.datetime64):
-                try:
-                    df[k] = pd.to_datetime(df[k])
-                except:
-                    datelike_columns.remove(k)
-
-        for k in datelike_columns:
-            if normalize and (df[k].dropna() == df[k].dropna().dt.normalize()).all():
-                df[k] = df[k].dt.date
-                date_columns.append(k)
-            else:
-                datetime_columns.append(k)
 
         # Parse start cell
         start_col, start_row = self.parse_start_cell(start_cell)
@@ -801,20 +800,25 @@ class ExcelFile(FileBase):
         # Force data_format to comply with the standard {column name : format}
         if isinstance(data_format, dict):
             if not all(k in df.columns for k in data_format):
-                if any(isinstance(v, (list, tuple, dict)) for v in data_format.values()):
+                if any(isinstance(v, (list, tuple, dict))
+                       for v in data_format.values()):
                     raise ValueError
                 data_format = {k: data_format for k in df.columns}
 
-        # Automatically determine the best formatting options for each dataframe column
+        # Auto-detects the best format for each DataFrame column
         if data_format == 'auto':
             data_format = dict()
 
             # cascade auto formatting
-            if total_row_format is None: total_row_format = 'auto'
-            if total_column_format is None: total_column_format = 'auto'
+            if total_row_format is None:
+                total_row_format = 'auto'
+
+            if total_column_format is None:
+                total_column_format = 'auto'
 
             infer_format = lambda fmt, s: \
-                fmt if s.sum() - s.round().sum() == 0 else f'{fmt}_two_decimals'
+                fmt if s.sum() - s.round().sum() == 0 \
+                else f'{fmt}_two_decimals'
 
             for k in numeric_columns:
                 if not df[k].isna().all():
@@ -831,14 +835,51 @@ class ExcelFile(FileBase):
                         s *= 100
                     data_format[k] = infer_format('percent', s)
 
-            for k in datetime_columns: data_format[k] = 'datetime'
-            for k in date_columns: data_format[k] = 'date'
+            if isinstance(date_format, dict):
+                date_formats = {}
+                for k in datelike_columns:
+                    v = date_format.get(k)
+                    if v is not None:
+                        odd.validate_value(value=v, types=str)
+                        date_formats[k] = v
+            else:
+                date_formats = {k: date_format for k in datelike_columns}
+
+            datetime_columns = set()
+
+            for k in list(datelike_columns):
+                if np.issubdtype(df[k].dtype, np.datetime64): continue
+                fmt = date_formats.get(k)
+                try:
+                    df[k] = pd.to_datetime(df[k], format=fmt)
+                except:
+                    if fmt is None:
+                        datelike_columns.remove(k)
+                    else:
+                        df[k] = df[k].apply(odd.ignore_nan(lambda x: \
+                            datetime.datetime.strptime(x, fmt)
+                            ))
+                        datetime_columns.add(k)
+
+            for k in datelike_columns:
+                data_format[k] = 'datetime'
+                if not normalize: continue
+                s = df[k].dropna()
+                if s.empty: continue
+                if k in datetime_columns:
+                    if all(x.time() == datetime.time(0, 0) for x in s.values):
+                        df[k] = df[k].apply(odd.ignore_nan(lambda x: x.date()))
+                        data_format[k] = 'date'
+                else:
+                    if (s == s.dt.normalize()).all():
+                        df[k] = df[k].dt.date
+                        data_format[k] = 'date'
 
         if isinstance(data_format, str):
             data_format = {k: data_format for k in df.columns}
 
         if isinstance(data_format, (list, tuple)):
-            data_format = {k: v for k,v in zip(df.columns, data_format)}
+            data_format = {k: v for k, v in zip(df.columns, data_format)}
 
         if data_format is not None and not isinstance(data_format, dict):
             raise TypeError(
@@ -882,8 +923,8 @@ class ExcelFile(FileBase):
             start_cell=(start_col + 1, start_row + 2),
             data=df.replace([np.inf, -np.inf], np.nan)\
                    .where(df.notnull(), None).values.tolist(),
-            formatting=[data_format.get(k) for k in df.columns] \
-                       if data_format is not None else None,
+            formatting=None if data_format is None else \
+                       [data_format.get(k) for k in df.columns],
             sheet=sheet,
             **kwargs
             )
@@ -1023,7 +1064,7 @@ class ExcelFile(FileBase):
             OrderedDict((i, k) for i, k in enumerate(sorted(list(set(x)))))
 
         counter = build_counter(rows) if down else build_counter(cols)
-        inverse_counter = {v: k for k,v in counter.items()}
+        inverse_counter = {v: k for k, v in counter.items()}
 
         for c, r in zip(cols, rows):
             x, y = self.get_column_letter(c - 1), str(r)
