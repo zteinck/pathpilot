@@ -406,7 +406,6 @@ class Folder(object):
             return False
 
 
-
     class Folders(Contents):
         '''
         Description
@@ -425,7 +424,6 @@ class Folder(object):
         def delete(self):
             for folder in self: folder.delete()
             self.folder._clear_subfolder_cache()
-
 
 
     class Files(Contents):
