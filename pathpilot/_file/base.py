@@ -5,7 +5,6 @@ import os
 import pandas as pd
 import numpy as np
 import oddments as odd
-import clockwork as cw
 from cachegrab import sha256
 
 from .._folder import Folder
@@ -136,34 +135,6 @@ class FileBase(object):
 
 
         @staticmethod
-        def add_timestamp(func):
-            '''
-            Parameters
-            ------------
-            args : tuple
-                arguments are only passed to the respective clockwork function
-            kwargs : dict
-                keyword arguments are passed to the respective clockwork function
-                with the exception of 'loc' and 'encase':
-
-                loc : str
-                    the location where you want the timestamp.
-                    Supported values are 'prefix' and 'suffix'
-                encase : bool
-                    if True, the timestamp is encased in paranthesis
-            '''
-
-            def wrapper(self, *args, **kwargs):
-                loc = kwargs.pop('loc', 'prefix')
-                encase = kwargs.pop('encase', False)
-                timestamp = func(self, *args, **kwargs)
-                if encase: timestamp = f'({timestamp})'
-                return getattr(self, loc)(timestamp)
-
-            return wrapper
-
-
-        @staticmethod
         def add_affix(func):
             '''
             Parameters
@@ -195,16 +166,16 @@ class FileBase(object):
         '''
         Description
         ------------
-        This method ensures that functions returning new instances create objects
-        of the correct subclass. For instance, if a CSVFile instance is converted
-        to an Excel file, this method guarantees that the returned instance is
-        an ExcelFile object. If subclass typing must be preserved regardless of
-        changes, the subclass can set the factory to None. For example, a
-        CryptoFile should always create instances of CryptoFile even if the
-        file extension is changed.
+        This method ensures that functions returning new instances create
+        objects of the correct subclass. For instance, if a CSVFile instance is
+        converted to an Excel file, this method guarantees that the returned
+        instance is an ExcelFile object. If subclass typing must be preserved
+        regardless of changes, the subclass can set the factory to None. For
+        example, a CryptoFile should always create instances of CryptoFile even
+        if the file extension is changed.
 
-        Note: This must be at the class level since calling self.factory() at
-        the instance level passes self as the first argument.
+        Note: This must be at the class level since calling self.file_factory()
+        at the instance level passes self as the first argument.
 
         Parameters
         ------------
@@ -218,7 +189,8 @@ class FileBase(object):
         file : FileBase subclass instance
             spawned file instance
         '''
-        return (cls if cls.factory is None else cls.factory)(*args, **kwargs)
+        ff = cls.file_factory
+        return (cls if ff is None else ff)(*args, **kwargs)
 
 
     #╭-------------------------------------------------------------------------╮
@@ -501,35 +473,3 @@ class FileBase(object):
     @Decorators.add_affix
     def suffix():
         ''' add suffix to file name '''
-
-
-    # helper functions adding timestamps to files
-    @Decorators.add_timestamp
-    def quarter(self, delta=0):
-        return cw.quarter_end(delta=delta).label
-
-
-    def qtr(self, *args, **kwargs):
-        return self.quarter(*args, **kwargs)
-
-
-    @Decorators.add_timestamp
-    def month(self, delta=0):
-        return cw.month_end(delta=delta).ymd
-
-
-    @Decorators.add_timestamp
-    def day(self, weekday, delta=0):
-        return cw.day_of_week(weekday=weekday, delta=delta).ymd
-
-
-    @Decorators.add_timestamp
-    def year(self, delta=0):
-        return str(cw.year_end(delta=delta).year)
-
-
-    @Decorators.add_timestamp
-    def timestamp(self, normalize=False, week_offset=0, fmt=None):
-        now = cw.Date(normalize=normalize, week_offset=week_offset)
-        now = str(now).replace(':','.') if fmt is None else now.str(fmt)
-        return now

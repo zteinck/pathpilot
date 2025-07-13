@@ -3,11 +3,8 @@ import shutil
 import os
 import pandas as pd
 import oddments as odd
-from cachegrab import sha256
-
 import clockwork as cw
-from clockwork.utils import \
-    convert_date_format_to_regex
+from cachegrab import sha256
 
 from ..decorators import check_read_only
 from ..exceptions import ReadOnlyError
@@ -36,7 +33,7 @@ class Folder(object):
 
     Class Attributes
     --------------------
-    factory : object
+    file_factory : object
         Function or class that determines which subclass is returned when
         a new file object is initialized.
     sorter : func
@@ -319,7 +316,7 @@ class Folder(object):
                     raise ValueError(' '.join(message + ['found.']))
 
             if date_format is not None and date_pattern is None:
-                date_pattern = convert_date_format_to_regex(date_format)
+                date_pattern = cw.date_format_to_regex(date_format)
 
             if date_pattern is not None:
                 date_pattern = format_date_pattern(date_pattern)
@@ -454,7 +451,7 @@ class Folder(object):
 
     @classmethod
     def _spawn_file(cls, *args, **kwargs):
-        return cls.factory(*args, **kwargs)
+        return cls.file_factory(*args, **kwargs)
 
 
     @classmethod
@@ -839,23 +836,6 @@ class Folder(object):
                 )
         destination.delete()
         shutil.copytree(self.path, destination.path)
-
-
-    # helper functions adding timestamps to folders
-    def quarter(self, delta=0, **kwargs):
-        return self.join(cw.quarter_end(delta=delta).label, **kwargs)
-
-
-    def month(self, delta=0, **kwargs):
-        return self.join(cw.month_end(delta=delta).ymd, **kwargs)
-
-
-    def day(self, weekday, delta=0, **kwargs):
-        return self.join(cw.day_of_week(weekday=weekday, delta=delta).ymd, **kwargs)
-
-
-    def year(self, delta=0, **kwargs):
-        return self.join(str(cw.year_end(delta=delta).year), **kwargs)
 
 
     #╭-------------------------------------------------------------------------╮

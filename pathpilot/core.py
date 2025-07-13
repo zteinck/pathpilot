@@ -27,7 +27,7 @@ extension_mapping = {
 #| Functions                                                               |
 #╰-------------------------------------------------------------------------╯
 
-def File(f, **kwargs):
+def file_factory(f, **kwargs):
     ''' assigns new file instances to the correct subclass '''
     extension = trifurcate(f)[-1]
     out = extension_mapping.get(extension, FileBase)(f, **kwargs)
@@ -44,8 +44,8 @@ def get_data_path():
 
 
 #╭-------------------------------------------------------------------------╮
-#| Assign Class Attribute                                                  |
+#| Assign Class Attributes                                                 |
 #╰-------------------------------------------------------------------------╯
 
-FileBase.factory = File
-Folder.factory = File
+FileBase.file_factory = file_factory
+Folder.file_factory = file_factory
