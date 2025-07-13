@@ -17,7 +17,7 @@ pip install pathpilot
 
 
 ## Main Features
-- `File` ➔ Function that assigns new file instances to the correct child class. Many file types are supported natively including: *.xlsx*, *.csv*, *.txt*, *.pickle*, etc. The mapping of file extensions to their respective classes is managed using the `extension_mapping` global dictionary. Unmapped extensions are assigned to the `FileBase` class.
+- `file_factory` ➔ Function that assigns new file instances to the correct child class. Many file types are supported natively including: *.xlsx*, *.csv*, *.txt*, *.pickle*, etc. The mapping of file extensions to their respective classes is managed using the `extension_mapping` global dictionary. Unmapped extensions are assigned to the `FileBase` class.
 - `Folder` ➔ Class for interacting with folders. It is important to be mindful of the `read_only` parameter which, if set to `True`, allows folders to be created or deleted programically.
 
 
@@ -26,7 +26,7 @@ Please note the examples below represent a small fraction of the functionality o
 
 ### Imports
 ```python
-from pathpilot import Folder, File
+from pathpilot import Folder, file_factory
 ```
 
 ### Folders
@@ -54,10 +54,10 @@ new_years_file = january_folder.join('Happy New Year.txt')
 ```
 
 ### Files
-First, we create an instance of the `ExcelFile` class using the `File` function. This occurs automatically by virtue of the `.xlsx` file extension.
+First, we create an instance of the `ExcelFile` class using the `file_factory` function. This occurs automatically by virtue of the `.xlsx` file extension.
 ```python
 # create ExcelFile instance
-file = File(r'C:\Users\MyID\Documents\MyFolder\MyFile.xlsx')
+file = file_factory(r'C:\Users\MyID\Documents\MyFolder\MyFile.xlsx')
 ```
 
 Next, let's check if the file exists. If not, let's save a `pandas` `DataFrame` as an Excel file.
@@ -75,7 +75,7 @@ Creating MyFile.xlsx
 
 Now let's read the file we created as a `DataFrame`.
 ```python
-# read the file we created as a pd.DataFrame 
+# read the file we created as a pd.DataFrame
 df = file.read()
 ```
 
