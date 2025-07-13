@@ -54,8 +54,6 @@ class ExcelFile(FileBase):
         keeps track of the current tab number
     verbose : bool
         if True, information is printed when a worksheet is created or written to.
-    troubleshoot : bool
-        if True, additional information is printed for troubleshooting purposes.
 
     Note:
     --------------------
@@ -73,16 +71,14 @@ class ExcelFile(FileBase):
         f,
         number_tabs=False,
         verbose=True,
-        troubleshoot=False,
         **kwargs
         ):
         super().__init__(f, **kwargs)
         self.format_cache = dict()
         self.sheet_cache = dict()
         self.number_tabs = number_tabs
-        self.page = 0
         self.verbose = verbose
-        self.troubleshoot = troubleshoot
+        self.page = 0
 
 
     #╭-------------------------------------------------------------------------╮
@@ -204,7 +200,8 @@ class ExcelFile(FileBase):
     @property
     def active_sheet(self):
         ''' current active worksheet '''
-        # used __dict__ because hasattr calls __getattr__ when attr not found in __dict__
+        # used __dict__ because hasattr calls __getattr__
+        # when attr not found in __dict__
         if '_active_sheet' not in self.__dict__:
             self.create_worksheet('Sheet1')
         return self._active_sheet
@@ -332,10 +329,6 @@ class ExcelFile(FileBase):
         out : *
             xlsxwriter.worksheet.Worksheet attribute
         '''
-
-        if self.troubleshoot:
-            print(f"self.__getattr__(name='{name}')")
-
         return getattr(self.active_sheet, name)
 
 
@@ -586,10 +579,15 @@ class ExcelFile(FileBase):
 
         if self.verbose:
              size_label = get_size_label(sys.getsizeof(data))
-             print(f"\twriting {size_label} to '{self.active_sheet.name}' tab", end='... ')
+             print(
+                f'\twriting {size_label} to '
+                f'{self.active_sheet.name!r} tab',
+                end='... '
+                )
 
         if not data:
-            if self.verbose: print('SKIPPED')
+            if self.verbose:
+                print('SKIPPED')
             return
 
         start_col, start_row = self.parse_start_cell(start_cell)
@@ -648,10 +646,10 @@ class ExcelFile(FileBase):
         '''
         Description
         ------------
-        Writes a DataFrame to an Excel worksheet. This is an alternative to df.to_excel()
-        that addresses some of its limitations such as not being able format cells that
-        already have a format including the index, headers, and cells that contain dates
-        or datetimes.
+        Writes a DataFrame to an Excel worksheet. This is an alternative to
+        df.to_excel() that addresses some of its limitations such as not being
+        able format cells that already have a format including the index,
+        headers, and cells that contain dates or datetimes.
 
         Parameters
         ------------
@@ -748,10 +746,16 @@ class ExcelFile(FileBase):
         # Check if empty
         if df.empty:
             if raise_on_empty:
-                raise ValueError("'df' argument cannot be empty.")
+                raise ValueError(
+                    "'df' argument cannot be empty."
+                    )
             if len(df.columns) == 0:
-                raise ValueError("'df' argument must have an index or columns")
-            total_row, total_column = False, False
+                raise ValueError(
+                    "'df' argument must have "
+                    "an index or columns."
+                    )
+            total_row = False
+            total_column = False
 
         # Check for duplicate column names
         odd.verify_no_duplicates(df=df, attr='columns')
@@ -761,7 +765,8 @@ class ExcelFile(FileBase):
             total_column_name = 'Total'
             if total_column_name in df.columns:
                 raise ValueError(
-                    f"'df' already has a column named '{total_column_name}'"
+                    "'df' already has a column "
+                    f"named {total_column_name!r}"
                     )
             df[total_column_name] = df.sum(axis=1, numeric_only=True)
 
@@ -776,13 +781,14 @@ class ExcelFile(FileBase):
         numeric_columns -= percent_columns
 
         datelike_columns = set(
-            df.select_dtypes(include=[np.datetime64]).columns.tolist()
+            df.select_dtypes(include=[np.datetime64])\
+            .columns.tolist()
             )
 
         for k in df.columns:
-            if isinstance(k, str) and \
-            odd.column_name_is_datelike(k) and \
-            str(df[k].dtype) != 'timedelta64[ns]':
+            if isinstance(k, str) \
+            and odd.column_name_is_datelike(k) \
+            and not np.issubdtype(df[k].dtype, np.timedelta64):
                 datelike_columns.add(k)
 
         # Parse start cell
@@ -799,6 +805,7 @@ class ExcelFile(FileBase):
 
         # Force data_format to comply with the standard {column name : format}
         if isinstance(data_format, dict):
+            # check if diciontary keys are index/column names
             if not all(k in df.columns for k in data_format):
                 if any(isinstance(v, (list, tuple, dict))
                        for v in data_format.values()):
@@ -807,14 +814,15 @@ class ExcelFile(FileBase):
 
         # Auto-detects the best format for each DataFrame column
         if data_format == 'auto':
-            data_format = dict()
 
             # cascade auto formatting
             if total_row_format is None:
-                total_row_format = 'auto'
+                total_row_format = data_format[:]
 
             if total_column_format is None:
-                total_column_format = 'auto'
+                total_column_format = data_format[:]
+
+            data_format = {}
 
             infer_format = lambda fmt, s: \
                 fmt if s.sum() - s.round().sum() == 0 \
@@ -848,18 +856,33 @@ class ExcelFile(FileBase):
             datetime_columns = set()
 
             for k in list(datelike_columns):
-                if np.issubdtype(df[k].dtype, np.datetime64): continue
+                if np.issubdtype(df[k].dtype, np.datetime64) \
+                    or df[k].isna().all():
+                    continue
+
                 fmt = date_formats.get(k)
+                to_dt = lambda x: pd.to_datetime(x, format=fmt)
+
                 try:
-                    df[k] = pd.to_datetime(df[k], format=fmt)
+                    df[k] = to_dt(df[k])
                 except:
-                    if fmt is None:
-                        datelike_columns.remove(k)
-                    else:
-                        df[k] = df[k].apply(odd.ignore_nan(lambda x: \
-                            datetime.datetime.strptime(x, fmt)
-                            ))
-                        datetime_columns.add(k)
+                    try:
+                        # handles mixed dtypes that will convert individually
+                        df[k] = df[k].apply(odd.ignore_nan(to_dt))
+                    except:
+                        types = set(type(x) for x in df[k].dropna())
+                        if types == {str}:
+                            if fmt is None:
+                                datelike_columns.remove(k)
+                            else:
+                                df[k] = df[k].apply(odd.ignore_nan(lambda x: \
+                                    datetime.datetime.strptime(x, fmt)
+                                    ))
+                                datetime_columns.add(k)
+                        elif all(issubclass(x, datetime.datetime) for x in types):
+                            datetime_columns.add(k)
+                        else:
+                            datelike_columns.remove(k)
 
             for k in datelike_columns:
                 data_format[k] = 'datetime'
@@ -867,7 +890,7 @@ class ExcelFile(FileBase):
                 s = df[k].dropna()
                 if s.empty: continue
                 if k in datetime_columns:
-                    if all(x.time() == datetime.time(0, 0) for x in s.values):
+                    if all(x.time() == datetime.time.min for x in s.values):
                         df[k] = df[k].apply(odd.ignore_nan(lambda x: x.date()))
                         data_format[k] = 'date'
                 else:
