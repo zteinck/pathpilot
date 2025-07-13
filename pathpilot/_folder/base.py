@@ -781,7 +781,7 @@ class Folder(object):
 
         Returns
         ----------
-        out : Folder | File
+        out : object
             folder or file object
         '''
         self.validate_join_args(args)

@@ -461,7 +461,7 @@ class FileBase(object):
 
 
     def deep_copy(self):
-        ''' create a copy of the File object '''
+        ''' create a copy of the file object '''
         return self.spawn(self.path)
 
 
