@@ -1,6 +1,6 @@
 import os
 import datetime
-from clockwork import Date
+import clockwork as cw
 
 
 def split_extension(x):
@@ -53,19 +53,28 @@ def get_cwd():
     return f
 
 
-def _timestamp_to_date(func):
+def _to_timestamp(func):
 
     def wrapper(path):
-        return Date(datetime.datetime.fromtimestamp(func(path)))
+        letter = func.__name__.split('_')[1][0]
+        ts = getattr(os.path, f'get{letter}time')(path)
+
+        # Conversion to datetime is redundant since cw.Timestamp
+        # constructor accepts timestamps, but explicitly using
+        # datetime library ensures time zone information is
+        # respected in case constructor behavior ever changes.
+        dt = datetime.datetime.fromtimestamp(ts)
+
+        return cw.Timestamp(dt)
 
     return wrapper
 
 
-@_timestamp_to_date
-def get_created_date(path):
-    return os.path.getctime(path)
+@_to_timestamp
+def get_created_date():
+    pass
 
 
-@_timestamp_to_date
-def get_modified_date(path):
-    return os.path.getmtime(path)
+@_to_timestamp
+def get_modified_date():
+    pass
