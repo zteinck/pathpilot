@@ -828,16 +828,19 @@ class ExcelFile(FileBase):
                 fmt if s.sum() - s.round().sum() == 0 \
                 else f'{fmt}_two_decimals'
 
+            clean_abs_numeric = lambda x: \
+                pd.to_numeric(x, errors='coerce').dropna().abs()
+
             for k in numeric_columns:
                 if not df[k].isna().all():
-                    s = df[k].dropna().abs()
+                    s = clean_abs_numeric(df[k])
                     if s.max() >= 1000:
                         data_format[k] = infer_format('commas', s)
 
             for k in percent_columns:
                 if not df[k].isna().all():
-                    s = df[k].dropna().abs()
-                    if s[s > 0].min() >= 1:
+                    s = clean_abs_numeric(df[k])
+                    if s.where(s > 0).min() >= 1:
                         df[k] /= 100
                     else:
                         s *= 100
