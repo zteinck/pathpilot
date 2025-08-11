@@ -834,13 +834,15 @@ class ExcelFile(FileBase):
             for k in numeric_columns:
                 if not df[k].isna().all():
                     s = clean_abs_numeric(df[k])
-                    if s.max() >= 1000:
+                    abs_max = s.max()
+                    if pd.notna(abs_max) and abs_max >= 1000:
                         data_format[k] = infer_format('commas', s)
 
             for k in percent_columns:
                 if not df[k].isna().all():
                     s = clean_abs_numeric(df[k])
-                    if s.where(s > 0).min() >= 1:
+                    abs_min = s.where(s > 0).min()
+                    if pd.notna(abs_min) and abs_min >= 1:
                         df[k] /= 100
                     else:
                         s *= 100
