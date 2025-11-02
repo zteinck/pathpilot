@@ -32,8 +32,8 @@ def backup_folder(
     shallow : bool
         filecmp.cmp(f1, f2, shallow=True) shallow argument.
         "If shallow is true and the os.stat() signatures (file type, size, and
-        modification time) of both files are identical, the files are taken to be
-        equal."
+        modification time) of both files are identical, the files are taken to
+        be equal."
         https://docs.python.org/3/library/filecmp.html
     verbose : bool
         if True, all folders and files that were backed up or overwritten are

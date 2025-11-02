@@ -87,13 +87,15 @@ class Folder(object):
         '''
         Description
         --------------------
-        Class that enables operations on all contents of a folder collectively,
-        including obtaining metadata, filtering, deleting, and more. This class
-        encompasses both files and folders but you can access them separetly by
-        using the Files and Folders subclasses, respectively.
+        Class that enables operations on all contents of a folder
+        collectively, including obtaining metadata, filtering, deleting,
+        and more. This class encompasses both files and folders but you can
+        access them separetly by using the Files and Folders subclasses,
+        respectively.
 
-        Note: This class and its subclasses are intended to be accessed indirectly
-        by using the 'contents', 'folders', and 'files' Folder cached properties.
+        Note: This class and its subclasses are intended to be accessed
+        indirectly by using the 'contents', 'folders', and 'files' Folder
+        cached properties.
 
         Class Attributes
         --------------------
@@ -205,7 +207,8 @@ class Folder(object):
                 Example:
                 ------------
                 Consider a folder that contains multiple files that include a
-                YYYY-MM-DD timestamp in the name such as '2024-06-23 Budget.xlsx'.
+                YYYY-MM-DD timestamp in the name such as
+                '2024-06-23 Budget.xlsx'.
                 In this case you might pass date_pattern=r'\d{4}\-\d{2}\-\d{2}'
 
             date_format : str
@@ -214,35 +217,37 @@ class Folder(object):
                     • 'date_pattern' is None ➜ an attempt will be made to derive
                       the regex pattern using 'date_format' as the template.
                     • 'date_pattern' is not None ➜ 'date_format' is optional but
-                      it can be included if you do not want to rely on pd.to_datetime
-                      inferring the format.
+                      it can be included if you do not want to rely on
+                      pd.to_datetime inferring the format.
 
                 Example:
                 ------------
                 Dealing with the same example from above, all the following
                 combinations will achieve the same result since the None values
                 being inferred:
-                    • date_pattern=r'\d{4}\-\d{2}\-\d{2}', date_format='%Y-%m-%d'
+                    • date_pattern=r'\d{4}\-\d{2}\-\d{2}',
+                      date_format='%Y-%m-%d'
                     • date_pattern=None, date_format='%Y-%m-%d'
                     • date_pattern=r'\d{4}\-\d{2}\-\d{2}', date_format=None
 
             ext : str
                 If not None, only those file objects with this file extension
                 will be considered candidates. This argument may be passed with
-                or without a period and is not case sensitive (e.g. '.txt', 'txt',
-                '.TXT' are all valid).
+                or without a period and is not case sensitive (e.g. '.txt',
+                'txt', '.TXT' are all valid).
             index : int
-                If not None, the object at this integer index in the filtered and
-                sorted data is returned.
+                If not None, the object at this integer index in the filtered
+                and sorted data is returned.
             sort_by : str
-                Name of self.meta_data column to sort by. This argument must be None
-                if the 'date_pattern' or 'date_format' arguments are not None. Defaults
-                to the object created date if None.
+                Name of self.meta_data column to sort by. This argument must
+                be None if the 'date_pattern' or 'date_format' arguments are
+                not None. Defaults to the object created date if None.
             ascending : bool
-                If True, data is sorted in ascending order, otherwise, descending order.
-                If the 'date_pattern' or 'date_format' arguments are not None, the sort
-                will occur on the timestamps extracted from the object names, otherwise,
-                the column denoted by the 'sort_by' argument is used.
+                If True, data is sorted in ascending order, otherwise,
+                descending order. If the 'date_pattern' or 'date_format'
+                arguments are not None, the sort will occur on the timestamps
+                extracted from the object names, otherwise, the column denoted
+                by the 'sort_by' argument is used.
             errors : bool
                 determines how exceptions are handled:
                     • 'raise': exception is raised
@@ -278,8 +283,9 @@ class Folder(object):
             else:
                 if date_format or date_pattern:
                     raise ValueError(
-                        "cannot pass 'sort_by' argument if either 'date_format' "
-                        "or 'date_pattern' arguments are not None."
+                        "cannot pass 'sort_by' argument if either "
+                        "'date_format' or 'date_pattern' arguments are "
+                        "not None."
                         )
 
             kind = self.__class__.__name__.lower()
@@ -311,8 +317,11 @@ class Folder(object):
 
                 if df.empty:
                     if errors == 'ignore': return
-                    message = [f"no {kind} matching name pattern '{name_pattern}'"]
-                    if ext is not None: message.append(f"with extension '.{ext}'")
+                    message = [
+                        f"no {kind} matching name pattern '{name_pattern}'"
+                        ]
+                    if ext is not None:
+                        message.append(f"with extension '.{ext}'")
                     raise ValueError(' '.join(message + ['found.']))
 
             if date_format is not None and date_pattern is None:
@@ -333,15 +342,18 @@ class Folder(object):
                         )
 
                 s = pd.to_datetime(s.dropna(), format=date_format)
-                df = df.join(s, how='inner').sort_values(by=s.name, ascending=ascending)
+
+                df = df.join(s, how='inner')\
+                    .sort_values(by=s.name, ascending=ascending)
 
             if index is not None:
-                if not isinstance(index, int):
-                    raise TypeError(
-                        f"'index' argument must be an integer, not {type(index)}"
-                        )
+                odd.validate_value(
+                    value=index,
+                    name='index',
+                    types=int
+                    )
                 try:
-                    return self.to_dict()[ df.iloc[index].name ]
+                    return self.to_dict()[df.iloc[index].name]
                 except Exception as error:
                     if errors == 'ignore': return
                     raise error
@@ -682,7 +694,8 @@ class Folder(object):
                 self._subfolder_cache[key] = folder
                 return self._subfolder_cache[key]
 
-        # cache subfolder that does not exist yet (it will now if read_only=False)
+        # cache subfolder that does not exist yet
+        # (it will now if read_only=False)
         if self.troubleshoot:
             print(f"could not find subfolder = '{name}'")
 
@@ -746,16 +759,17 @@ class Folder(object):
 
                 >> C:/Users/Me/MyFolder/A/B/
 
-            • Strings preceded by a period prior to the final argument are treated
-              like dot folders:
+            • Strings preceded by a period prior to the final argument are
+              treated like dot folders:
 
                 folder.join('.A','.B','C')
 
                 >> C:/Users/Me/MyFolder/.A/.B/C/
 
-            • Strings preceded by a period that are also the final argument present
-              a special case. It will be treated as a dot file unless you add a slash
-              slash to signal you intend for it to be considered a dot folder.
+            • Strings preceded by a period that are also the final argument
+              present a special case. It will be treated as a dot file unless
+              you add a slash to signal you intend for it to be considered a
+              dot folder.
 
                 In this case, .env would be a dot folder subfile in folder B.
 
@@ -790,7 +804,8 @@ class Folder(object):
 
         if is_file(f):
             if not self.read_only:
-                # creates the folder(s) in the file path if they do not already exist
+                # creates the folder(s) in the file path if they do not
+                # already exist
                 self.join(*f.replace(self.path,'').split('/')[:-1])
             return self.spawn_file(f, **kwargs)
 
@@ -847,7 +862,11 @@ class Folder(object):
         ''' verify join args are valid '''
 
         error_template = 'Invalid join argument detected at index %d:'
-        period_rules = 'However, arguments may begin with or contain a single period.'
+
+        period_rules = (
+            'However, arguments may begin with '
+            'or contain a single period.'
+            )
 
         for index, arg in enumerate(args):
             err_msg = error_template % index

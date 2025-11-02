@@ -41,7 +41,8 @@ def trifurcate(f, default_folder=True):
     f = f + '/' if explicitly_folder or '.' not in f.split('/')[-1] else f
     if f.split('/')[0][-4:].lower() == '.com': f = '//' + f
     f = f.rsplit('/', 1)
-    folder = f[0] + '/' if len(f) == 2 else (get_cwd() if default_folder else '')
+    folder = f[0] + '/' if len(f) == 2 else \
+        (get_cwd() if default_folder else '')
     name, ext = split_extension(f[-1])
     return folder, name, ext.lower()
 

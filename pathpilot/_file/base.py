@@ -383,7 +383,9 @@ class FileBase(object):
     def trifurcate_and_fill(self, f):
         ''' trifurcates file and fills gaps with instance attributes '''
         folder, name, ext = trifurcate(f, default_folder=False)
-        f = (folder or self.directory) + (name or self.name) + '.' + (ext or self.ext)
+        f = (folder or self.directory) + \
+            (name or self.name) + '.' + \
+            (ext or self.ext)
         return self.spawn(f)
 
 
@@ -447,8 +449,8 @@ class FileBase(object):
 
 
     def swap(self, **kwargs):
-        ''' quick way of intitializing a new file with different attribute(s)
-            (e.g. you have a csv file and want an xlsx file of the same name) '''
+        ''' returns a new file instance with different attribute(s) (e.g.
+            you have a csv file and want an xlsx file of the same name) '''
         alias_map = {'folder': 'directory', 'ext': 'extension'}
         kwargs = {alias_map.get(k, k): v for k, v in kwargs.items()}
         directory, name, extension = [

@@ -151,8 +151,11 @@ class SQLiteFile(FileBase):
     def format_payload(self, tbl_name, col_names, payload):
         if isinstance(payload, tuple): payload = [payload]
         mapping = self.data_types(tbl_name)
-        payload = [tuple([mapping[col](cell) if pd.notnull(cell) else None
-                          for col,cell in zip(col_names, row)]) for row in payload]
+        payload = [
+            tuple([mapping[col](cell) if pd.notnull(cell) else None
+            for col, cell in zip(col_names, row)])
+            for row in payload
+            ]
         return payload
 
 
@@ -199,7 +202,12 @@ class SQLiteFile(FileBase):
         if where_cols:
             where_cols = odd.lower_iterable(odd.ensure_list(where_cols))
             col_names = [x for x in col_names if x not in where_cols]
-            sql = self.update_query(tbl_name, col_names, where_cols, where_logic)
+            sql = self.update_query(
+                tbl_name,
+                col_names,
+                where_cols,
+                where_logic
+                )
             col_names.extend(where_cols)
             df = df[col_names]
         else:
@@ -216,12 +224,17 @@ class SQLiteFile(FileBase):
     def copy_as_temp(self, target_name, temp_name=None, index=None):
         ''' creates temporary table based on permanent table '''
         temp_name = temp_name or target_name
-        sql = f'CREATE TEMP TABLE {temp_name} AS SELECT * FROM {target_name} LIMIT 0;'
+
+        sql = f'CREATE TEMP TABLE {temp_name} AS ' + \
+              f'SELECT * FROM {target_name} LIMIT 0;'
+
         self.c.execute(sql)
         self.conn.commit()
 
         if index:
-            sql = f"CREATE INDEX temp.idx ON {temp_name}({', '.join(odd.ensure_list(index))})"
+            sql = f"CREATE INDEX temp.idx ON {temp_name}(%s)" % \
+                ', '.join(odd.ensure_list(index))
+
             self.c.execute(sql)
             self.conn.commit()
 

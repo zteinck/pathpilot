@@ -30,22 +30,22 @@ class ExcelFile(FileBase):
     active_sheet : xlsxwriter.worksheet.Worksheet
         The active worksheet
     sheet_cache : dict
-        Dictionary where the keys are worksheet names and values are the worksheet
-        objects. It is important to note that the keys are the original sheet names
-        passed by the user as opposed to the actual name that appears in the excel
-        file and worksheet.name attribute because the latter is truncated by the 31
-        character limit and/or will have a page prefix added per the 'number_tabs'
-        argument. This setup allows the user to access the sheet using the original
-        name.
+        Dictionary where the keys are worksheet names and values are the
+        worksheet objects. It is important to note that the keys are the
+        original sheet names passed by the user as opposed to the actual name
+        that appears in the excel file and worksheet.name attribute because the
+        latter is truncated by the 31 character limit and/or will have a page
+        prefix added per the 'number_tabs' argument. This setup allows the user
+        to access the sheet using the original name.
     formats : dict
-        keys are strings representing names of formats and values are dictionaries
-        containing format parameters. For Example, {{'bold': {'bold': True}}. These
-        are intended to be frequently used formats that can be both used individually
-        and as building blocks for more complex formats (see self.add_format for more
-        information.)
+        Keys are strings representing names of formats and values are
+        dictionaries containing format parameters. For Example, {{'bold':
+        {'bold': True}}. These are intended to be frequently used formats that
+        can be both used individually and as building blocks for more complex
+        formats (see self.add_format for more information.)
     format_cache : dict
-        keys are hashes of sorted dictionaries containing format parameters and
-        values are xlsxwriter.format.Format. This is done so that only one
+        keys are hashes of sorted dictionaries containing format parameters
+        and values are xlsxwriter.format.Format. This is done so that only one
         format instance will be created per unique format used.
     number_tabs : bool
         if True, tabs in the workbook will have a number prefix. For example,
@@ -53,7 +53,8 @@ class ExcelFile(FileBase):
     page : int
         keeps track of the current tab number
     verbose : bool
-        if True, information is printed when a worksheet is created or written to.
+        if True, information is printed when a worksheet is created or written
+        to.
 
     Note:
     --------------------
@@ -299,9 +300,18 @@ class ExcelFile(FileBase):
             'header': {'bold': True,'bottom': True, 'text_wrap': True},
 
             # Conditional
-            'conditional_red': {'bg_color': '#FFC7CE', 'font_color': '#9C0006'},
-            'conditional_green': {'bg_color': '#C6EFCE', 'font_color': '#006100'},
-            'conditional_yellow': {'bg_color': '#FFEB9C', 'font_color': '#9C6500'},
+            'conditional_red': {
+                'bg_color': '#FFC7CE',
+                'font_color': '#9C0006'
+                },
+            'conditional_green': {
+                'bg_color': '#C6EFCE',
+                'font_color': '#006100'
+                },
+            'conditional_yellow': {
+                'bg_color': '#FFEB9C',
+                'font_color': '#9C6500'
+                },
             }
 
         return format_presets
@@ -316,8 +326,8 @@ class ExcelFile(FileBase):
         Description
         ------------
         Called when an attribute is referenced that does not exist. In this
-        case, attributes that do not exist will be assumed to be active worksheet
-        object attributes (e.g. '.hide_gridlines').
+        case, attributes that do not exist will be assumed to be active
+        worksheet object attributes (e.g. '.hide_gridlines').
 
         Parameters
         ------------
@@ -387,11 +397,12 @@ class ExcelFile(FileBase):
         Parameters
         ------------
         args : pd.DataFrame | list | dict
-            • if list, each dataframe in the list is written to a separate worksheet.
-            • if dict, the keys are considered sheet names and the values should be
-                       dataframes. (i.e. {'My Sheet 1': df1, 'My Sheet 2': df2}).
-                       You may not pass a sheets argument when passing a dictionary
-                       as the args argument.
+            • if list, each dataframe in the list is written to a separate
+                worksheet.
+            • if dict, the keys are considered sheet names and the values
+                should be DataFrames. (i.e. {'My Sheet 1': df1, 'My Sheet 2':
+                df2}). You may not pass a sheets argument when passing a
+                dictionary as the args argument.
         sheets : list | str | None
             Mist of sheet names. Must be None when 'args' is a dictionary.
         kwargs : dict
@@ -407,7 +418,8 @@ class ExcelFile(FileBase):
             if isinstance(args, dict):
                 if sheets is not None:
                     raise ValueError(
-                        "'sheets' argument must be None when a dictionary is passed"
+                        "'sheets' argument must be None "
+                        "when a dictionary is passed"
                         )
                 sheets = list(args.keys())
                 args = list(args.values())
@@ -482,44 +494,44 @@ class ExcelFile(FileBase):
         ------------
         start_cell : str | tuple
             Individual cell range to be used as the starting position for the
-            fill. May be a standard excel range (e.g. 'A2') or a tuple of length
-            two (column, row) (e.g. (1, 2) | ('A', 2)).
+            fill. May be a standard excel range (e.g. 'A2') or a tuple of
+            length two (column, row) (e.g. (1, 2) | ('A', 2)).
         data : 1D list | 2D list | single value | pd.DataFrame | pd.Series
-            Data to be written to excel worksheet starting in start_cell.
-            Each sub-list is treated as row data and written in sequential order.
-            For example, if start_cell = 'A1' and data = [[1, 2, 3], ['a', 'b', 'c']],
-            then row 1 and 2 will be filled with 1, 2, 3 and 'a', 'b', 'c', respectively.
-        formatting : str | dict | one-dimensional list | one-dimensional tuple | None
+            Data to be written to excel worksheet starting in start_cell. Each
+            sub-list is treated as row data and written in sequential order.
+            For example, if start_cell = 'A1' and data = [[1, 2, 3], ['a', 'b',
+            'c']], then row 1 and 2 will be filled with 1, 2, 3 and 'a', 'b',
+            'c', respectively.
+        formatting : str | dict | list(1D) | tuple(1D) | None
             Excel formatting to be applied to data. Supported types include:
-                • str ➜ Strings are interpreted as self.formats dictionary keys.
-                         Passing a single string (e.g. formatting='bold') causes
-                         the corresponding format to be be universally applied to
-                         all data cells.
+                • str ➜ Strings are interpreted as self.formats dictionary
+                    keys. Passing a single string (e.g. formatting='bold')
+                    causes the corresponding format to be be universally
+                    applied to all data cells.
                 • dict ➜ Dictionaries are interpreted as format parameters.
-                          Passing a single dictionary (e.g. formatting =
-                          {'bold': True, 'num_format': '#,##0'}) causes the
-                          corresponding format to be be universally applied
-                          to all data cells.
+                    Passing a single dictionary (e.g. formatting = {'bold':
+                    True, 'num_format': '#,##0'}) causes the corresponding
+                    format to be be universally applied to all data cells.
                 • list | tuple ➜ formats included in a list/tuuple are applied
-                                  to columns in sequential order. If the length
-                                  of the list/tuple is shorter than the number
-                                  of columns then no format is applied to the
-                                  remaining columns.
+                    to columns in sequential order. If the length of the list
+                    or tuple is shorter than the number of columns then no
+                    format is applied to the remaining columns.
                 • None ➜ no formatting is applied.
         inverse : bool
-            If True, the 2D data is inverted such that each sub-list is treated
-            as column data as opposed to row data under the default behavior.
-            (e.g. [[1, 2, 3], ['a', 'b', 'c']] ➜ [[1, 'a'], [2, 'b'], [3, 'c']]
+            If True, the 2D data is inverted such that each sub-list is
+            treated as column data as opposed to row data under the default
+            behavior. For example:
+            [[1, 2, 3], ['a', 'b', 'c']] ➜ [[1, 'a'], [2, 'b'], [3, 'c']]
         repeat : int
             If 'data' argument is a single data element then it will be repeated
             or duplicated this number of times.
         sheet : str
-            If None, self.active_sheet is utilized. If self.active_sheet has not
-                     yet been assigned, it will be assigned to a newly created
-                     blank worksheet named 'Sheet1'.
-            If not None, self.active_sheet will be assigned to the passed sheet name.
-                         If the passed name does not correspond to an existing sheet,
-                         it will be created.
+            If None, self.active_sheet is utilized. If self.active_sheet has
+                not yet been assigned, it will be assigned to a newly created
+                blank worksheet named 'Sheet1'.
+            If not None, self.active_sheet will be assigned to the passed
+                sheet name. If the passed name does not correspond to an
+                existing sheet, it will be created.
         outer_border : bool
             If True, data is encased in an outer border.
 
@@ -666,60 +678,60 @@ class ExcelFile(FileBase):
         data_format : ↑
             Special cases:
             • 'auto' ➜ formatting is automatically applied to numeric, percent,
-                        and date fields.
+                and date fields.
             • dict ➜ if the dictionary keys are only comprised of 'df' index or
-                      column names then the values are treated like format
-                      parameters and formatting is only applied to those columns
-                      included in the keys. If not all the key values are column
-                      names then the dictionary receives the default treatment
-                      outlined in the self.write documentation. (e.g.
-                      {'Price': 'commas', 'Total': {'bold': True}})
+                column names then the values are treated like format parameters
+                and formatting is only applied to those columns included in the
+                keys. If not all the key values are column names then the
+                dictionary receives the default treatment outlined in the
+                self.write documentation. (e.g.{'Price': 'commas', 'Total':
+                {'bold': True}})
             Other cases:
                 see self.write 'formatting' argument documentation.
         column_widths : 'auto' | list | tuple | dict
-            • 'auto' ➜ xlsxwriter does not support auto-fitting column widths so
-                           this attempts replicate it by setting the column width
-                           according to the length of the values in each column
-                           (up to a certain limit).
+            • 'auto' ➜ xlsxwriter does not support auto-fitting column widths
+                so this attempts replicate it by setting the column width
+                according to the length of the values in each column (up to a
+                certain limit).
             • list | tuple ➜ widths are applied to columns in sequential order.
-                           If the length of the list/tuple is shorter than the
-                           number of columns then the width is not set on the
-                           remaining columns.
+                If the length of the list/tuple is shorter than the
+                number of columns then the width is not set on the
+                remaining columns.
             • dict ➜ dictionary where keys are DataFrame column names and values
-                           are column widths. Any column names excluded from the
-                           dictionary will not have their widths set.
+                are column widths. Any column names excluded from the dictionary
+                will not have their widths set.
         date_format : None | str | dict
             Defines how date-like columns are parsed when data_format='auto'
             (e.g. '%Y-%m-%d'). Options include:
             • None ➜ format is inferred.
             • str ➜ used for all date-like columns.
             • dict ➜ dictionary where keys are DataFrame column names and values
-                      are formats. Any column names excluded from the dictionary
-                      default to None.
+                are formats. Any column names excluded from the dictionary
+                default to None.
         normalize : bool
             if True, any date columns where the hours, minutes, seconds,
-                     microseconds are all set to zero (midnight) will be converted
-                     from a datetime to date.
+                microseconds are all set to zero (midnight) will be converted
+                from a datetime to date.
         autofilter : bool
             if True, a filter will be applied to the column headers.
         raise_on_empty : bool
             if True and the 'df' argument is empty, an exception will be raised.
             if False, the 'df' columns will be written to an otherwise empty
-                      worksheet.
+                worksheet.
         total_row : bool
-            if True, a row is added at the bottom reflecting the sum of each numeric
-                     column.
+            if True, a row is added at the bottom reflecting the sum of each
+                numeric column.
         total_row_format : ^
-            format applied if 'total_row' is True. If None and data_format='auto',
-            then the same formatting will be applied to the total row plus bold
-            and a top border.
+            format applied if 'total_row' is True. If None and data_format =
+            'auto', then the same formatting will be applied to the total row
+            plus bold and a top border.
         total_column : bool
-            if True, a column is added at the end reflecting the sum of all numeric
-            values in each row.
+            if True, a column is added at the end reflecting the sum of all
+            numeric values in each row.
         total_column_format : ^
-            format applied if 'total_column' is True. If None and data_format='auto',
-            then the same formatting will be applied to the total column plus bold and
-            a left border.
+            format applied if 'total_column' is True. If None and data_format =
+            'auto', then the same formatting will be applied to the total column
+            plus bold and a left border.
 
         Returns
         ------------
@@ -880,11 +892,14 @@ class ExcelFile(FileBase):
                             if fmt is None:
                                 datelike_columns.remove(k)
                             else:
-                                df[k] = df[k].apply(odd.ignore_nan(lambda x: \
-                                    datetime.datetime.strptime(x, fmt)
+                                df[k] = df[k].apply(odd.ignore_nan(
+                                    lambda x: datetime.datetime.strptime(x, fmt)
                                     ))
                                 datetime_columns.add(k)
-                        elif all(issubclass(x, datetime.datetime) for x in types):
+                        elif all(
+                            issubclass(x, datetime.datetime)
+                            for x in types
+                            ):
                             datetime_columns.add(k)
                         else:
                             datelike_columns.remove(k)
@@ -964,8 +979,12 @@ class ExcelFile(FileBase):
             last_row = first_row + len(df) - 1
             for k in df.columns:
                 if k in numeric_columns:
-                    col = self.get_column_letter(start_col + df.columns.get_loc(k))
-                    total_row.append(f'=SUM({col}{first_row}:{col}{last_row})')
+                    col = self.get_column_letter(
+                        start_col + df.columns.get_loc(k)
+                        )
+                    total_row.append(
+                        f'=SUM({col}{first_row}:{col}{last_row})'
+                        )
                 else:
                     total_row.append(None)
 
@@ -973,8 +992,10 @@ class ExcelFile(FileBase):
                 total_row_format = []
                 for k in df.columns:
                     fmt = ['bold','top']
-                    if total_column and k == total_column_name: fmt.append('left')
-                    if k in data_format: fmt.append(data_format[k])
+                    if total_column and k == total_column_name:
+                        fmt.append('left')
+                    if k in data_format:
+                        fmt.append(data_format[k])
                     total_row_format.append(fmt)
 
             if total_row_format is None and data_format is not None:
@@ -1044,20 +1065,22 @@ class ExcelFile(FileBase):
         Parameters
         ------------
         start_cell : str | tuple | list
-            Individual cell range to be used as the starting position for the fill.
-            May be a standard excel range (e.g. 'A2') or a tuple of length two
-            (column, row) (e.g. (1, 2) | ('A', 2)). Similar to the formula argument,
-            column names may include placeholders (e.g. '{Price}2' | ('{Price}', 2)).
+            Individual cell range to be used as the starting position for the
+            fill. May be a standard excel range (e.g. 'A2') or a tuple of
+            length two (column, row) (e.g. (1, 2) | ('A', 2)). Similar to the
+            formula argument, column names may include placeholders (e.g.
+            '{Price}2' | ('{Price}', 2)).
         formula : str
-            Excel formula to be written to the start cell and used as a fill template.
-            Column names may include placeholders with header names if 'headers'
-            argument is passed (e.g. '=A1+B1-{Price}1'. Placeholders make the formula
-            robust to changes in header positioning.
+            Excel formula to be written to the start cell and used as a fill
+            template. Column names may include placeholders with header names
+            if 'headers' argument is passed (e.g. '=A1+B1-{Price}1'.
+            Placeholders make the formula robust to changes in header
+            positioning.
         limit : int
             Number of rows or columns to fill.
         headers : list
-            List of column header names. Required argument when placeholders are
-            used in formula or start_cell.
+            List of column header names. Required argument when placeholders
+            are used in formula or start_cell.
         formatting : str
             see write() argument of the same name.
         down : bool
@@ -1086,7 +1109,8 @@ class ExcelFile(FileBase):
 
         components = list(set(re.findall('([a-zA-Z]+)(\d+)', formula)))
         cols, rows = zip(*components)
-        cols, rows = [self.get_column_index(x) + 1 for x in cols], [int(x) for x in rows]
+        cols = [self.get_column_index(x) + 1 for x in cols]
+        rows = [int(x) for x in rows]
 
         build_counter = lambda x: \
             OrderedDict((i, k) for i, k in enumerate(sorted(list(set(x)))))
@@ -1104,7 +1128,10 @@ class ExcelFile(FileBase):
         for x in range(limit):
             format_args = list(counter.values())
             if not down:
-                format_args = [self.get_column_letter(c - 1) for c in format_args]
+                format_args = [
+                    self.get_column_letter(c - 1)
+                    for c in format_args
+                    ]
             data.append(formula.format(*format_args))
             for k in counter:
                 counter[k] += 1
@@ -1130,19 +1157,17 @@ class ExcelFile(FileBase):
         ------------
         name : str | tuple | list
             • str ➜ name of new format.
-                     If 'fmt' is None, if the name is already in self.formats
-                        then no action is taken. If the name does not already
-                        exist then the name's components (delimited by underscores
-                        ('_')) will be combined into a new format (e.g.
-                        'bold_commas').
-                     if 'fmt' is not None, if the name conflicts with an existing
-                        format name, the existing format will be overwritten.
-            • tuple | list ➜ If 'fmt' is None, components will be combined into a
-                              new format. For example, self.add_format(
-                              name=['bold','commas'], fmt=None) would add the
-                              following entry to self.formats: {'bold_commas':
-                              {'bold': True, 'num_format': '#,##0'}
-
+                If 'fmt' is None, if the name is already in self.formats then
+                    no action is taken. If the name does not already exist then
+                    the name's components (delimited by underscores ('_')) will
+                    be combined into a new format (e.g.'bold_commas').
+                if 'fmt' is not None, if the name conflicts with an existing
+                    format name, the existing format will be overwritten.
+            • tuple | list ➜ If 'fmt' is None, components will be combined
+                into a new format. For example, self.add_format(name=
+                ['bold','commas'], fmt=None) would add the following entry to
+                self.formats: {'bold_commas': {'bold': True, 'num_format':
+                '#,##0'}
         fmt : dict | None
             • dict ➜ see https://xlsxwriter.readthedocs.io/format.html
             • None ➜ format will be constructed based on the components
@@ -1150,23 +1175,29 @@ class ExcelFile(FileBase):
         Returns
         ------------
         out : str
-            name of format (in other words, the self.formats dictionary key value)
+            Name of format (in other words, the self.formats dictionary key
+            value)
         '''
         if fmt is None:
             if isinstance(name, str):
-                if name in self.formats: return name
+                if name in self.formats:
+                    return name
                 name = name.split('_')
-            if not isinstance(name, (tuple, list)):
-                raise TypeError(
-                    f"'name' arguments of type {type(name).__name__} not supported."
-                    )
+
+            odd.validate_value(
+                value=name,
+                name=name,
+                types=(tuple, list)
+                )
+
             fmt = dict()
             for k in name: fmt.update(self.formats[k])
             name = '_'.join(odd.natural_sort(name))
         else:
             if not isinstance(name, str):
                 raise TypeError(
-                    "'name' argument must be a string if 'fmt' is not None, not: "
+                    "'name' argument must be a string "
+                    "if 'fmt' is not None, not: "
                     f"{type(fmt).__name__}"
                     )
 

@@ -48,24 +48,27 @@ class ZipFile(FileBase):
         Parameters
         ------------
         payload : str | list | tuple | FileBase | Folder
-            str representing a single file or folder or list or tuple comprised
-            of str, FileBase, or Folder representing files and folders to be
-            zipped
+            String representing a single file or folder or a list or tuple
+            comprised of string, FileBase, or Folder objects representing
+            files and folders to be zipped.
         delete_original : bool
             If True, zipped files/folders are deleted after being zipped
         filter_func : callable
-            function applied to every file in the folder (argument will be of
-            type FileBase). If filter_func returns True for a given file it will
-            be included in the zip process otherwise excluded (e.g. filters out
-            files that are not of file extention .py lambda x: x.ext == 'py').
+            Function applied to every file in the folder (argument will be of
+            type FileBase). If filter_func returns True for a given file it
+            will be included in the zip process otherwise excluded (e.g.
+            filters out files that are not of file extention .py lambda x:
+            x.ext == 'py').
         include_folders : bool
-            if True, each object being zipped will be placed in a folder
-            mirroring the name of the folder in which the unzipped version resides.
-            This argument cannot be true when files_only is True.
+            If True, each object being zipped will be placed in a folder
+            mirroring the name of the folder in which the unzipped version
+            resides.
+            Note: This argument cannot be true when files_only is True.
         files_only : bool
-            if True, zip folder will only include individual files, folders are
-            disregarded. For example, if you pass a folder that contains subfolders,
-            all the individual files will be zipped and subfolders are discarded.
+            if True, zip folder will only include individual files, folders
+            are disregarded. For example, if you pass a folder that contains
+            subfolders, all the individual files will be zipped and subfolders
+            are discarded.
             This is the default behavior when 'payload' contains files. This
             argument cannot be True when include_folder is True.
         verbose : bool
@@ -83,14 +86,19 @@ class ZipFile(FileBase):
             'C:/Folder C/'
             ]
 
-        'Folder C' contains 'File 3.txt' and a subfolder 'Folder D' with a file called
-        'File 4.txt'.
+        'Folder C' contains 'File 3.txt' and a subfolder 'Folder D' with a
+        file called 'File 4.txt'.
 
         • Default (include_folders=False, files_only=False)
-            Under default behavior the only time a folder will be included in the zip
-            folder is when a passed folder contains subfolders
+            Under default behavior the only time a folder will be included in
+            the zip folder is when a passed folder contains subfolders
 
-            Output: ['File 1.txt', 'File 2.txt', 'File 3.txt', 'Folder D/File 4.txt']
+            Output: [
+                'File 1.txt',
+                'File 2.txt',
+                'File 3.txt',
+                'Folder D/File 4.txt'
+                ]
 
         • include_folders=True
             Every file will retain the folder in which it resides
@@ -155,7 +163,8 @@ class ZipFile(FileBase):
 
         if include_folders and files_only:
             raise ValueError(
-                "'include_folders' and 'files_only' arguments cannot both be True"
+                "'include_folders' and 'files_only' "
+                "arguments cannot both be True."
                 )
 
         if not isinstance(payload, (list, tuple)):
@@ -174,8 +183,14 @@ class ZipFile(FileBase):
                 folder_can_be_deleted = True
 
                 for f in obj.walk():
-                    zipped = zip_file(f, f.directory[:-1].replace(obj.parent.path, '').split('/'))
-                    if not zipped: folder_can_be_deleted = False
+                    p = f.directory[:-1]\
+                        .replace(obj.parent.path, '')\
+                        .split('/')
+
+                    zipped = zip_file(f, p)
+
+                    if not zipped:
+                        folder_can_be_deleted = False
 
                 if delete_original and folder_can_be_deleted:
                     shutil.rmtree(obj.path)
