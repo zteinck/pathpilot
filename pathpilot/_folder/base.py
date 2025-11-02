@@ -316,7 +316,7 @@ class Folder(object):
                     raise ValueError(' '.join(message + ['found.']))
 
             if date_format is not None and date_pattern is None:
-                date_pattern = cw.date_format_to_regex(date_format)
+                date_pattern = cw.temporal_format_to_regex(date_format)
 
             if date_pattern is not None:
                 date_pattern = format_date_pattern(date_pattern)
