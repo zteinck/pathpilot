@@ -412,10 +412,10 @@ class ExcelFile(FileBase):
                 sheets = list(args.keys())
                 args = list(args.values())
             else:
-                args = odd.to_iter(args)
+                args = odd.ensure_list(args)
 
             if sheets is not None:
-                sheets = odd.to_iter(sheets)
+                sheets = odd.ensure_list(sheets)
                 if len(args) != len(sheets):
                     raise ValueError(
                         f"length of 'args' ({len(args)}) != length of 'sheets' "
@@ -730,7 +730,7 @@ class ExcelFile(FileBase):
 
         odd.validate_value(
             value=date_format,
-            attr='date_format',
+            name='date_format',
             types=(str, dict),
             none_ok=True
             )
@@ -740,7 +740,7 @@ class ExcelFile(FileBase):
             raise NotImplementedError
 
         # Reset index
-        if odd.get_index_names(df):
+        if odd.has_named_index(df):
             df.reset_index(inplace=True)
 
         # Check if empty
@@ -758,7 +758,7 @@ class ExcelFile(FileBase):
             total_column = False
 
         # Check for duplicate column names
-        odd.verify_no_duplicates(df=df, attr='columns')
+        odd.verify_unique(df, column_names=True)
 
         # Add a total column to dataframe
         if total_column:
@@ -936,7 +936,7 @@ class ExcelFile(FileBase):
 
             if total_column_format == 'auto':
                 data_format[total_column_name] = \
-                    self.add_format(odd.to_iter(
+                    self.add_format(odd.ensure_list(
                         data_format.pop(total_column_name, [])
                         ) + ['bold','left'])
             else:
