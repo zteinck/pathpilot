@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "pathpilot"
-version = "0.3.4"
+version = "0.3.5"
 description = "Library that facilitates file and folder manipulation in Python."
 authors = ["Zachary Einck <zacharyeinck@gmail.com>"]
 license = "MIT"
@@ -12,7 +12,7 @@ homepage = "https://github.com/zteinck/pathpilot"
 python = "^3.8"
 clockwork = ">=0.4.0"
 cachegrab = ">=0.2.2"
-oddments = ">=0.4.0"
+oddments = ">=0.4.1"
 pandas = "*"
 numpy = "*"
 XlsxWriter = "*"
