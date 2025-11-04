@@ -588,7 +588,7 @@ class Folder(object):
                 v = getattr(self, k)
 
             if 'date' in k:
-                v = v.pandas
+                v = v.to_pandas_timestamp()
 
             s.loc[k] = v
 

@@ -300,7 +300,8 @@ class FileBase(object):
             ]:
             if s.loc['exists']:
                 v = getattr(self, k)
-                if 'date' in k: v = v.pandas
+                if 'date' in k:
+                    v = v.to_pandas_timestamp()
             else:
                 v = np.nan
 
