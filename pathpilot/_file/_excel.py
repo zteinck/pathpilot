@@ -783,7 +783,9 @@ class ExcelFile(FileBase):
             df[total_column_name] = df.sum(axis=1, numeric_only=True)
 
         # Categorize columns
-        numeric_columns = set(df._get_numeric_data().columns.tolist())
+        numeric_columns = set(
+            df.select_dtypes(include=['number']).columns.tolist()
+            )
 
         percent_columns = set([
             k for k in numeric_columns
