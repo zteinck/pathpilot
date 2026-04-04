@@ -1,20 +1,21 @@
 import sqlite3
 import os
+
+import oddments as odd
 import pandas as pd
 import numpy as np
-import oddments as odd
 
-from .base import FileBase
+from ..base import File
 
 
-class SQLiteFile(FileBase):
+class SQLiteFile(File):
 
     #╭-------------------------------------------------------------------------╮
     #| Initialize Instance                                                     |
     #╰-------------------------------------------------------------------------╯
 
-    def __init__(self, f, **kwargs):
-        super().__init__(f, **kwargs)
+    def __init__(self, path, **kwargs):
+        super().__init__(path, **kwargs)
 
 
     #╭-------------------------------------------------------------------------╮
@@ -100,7 +101,9 @@ class SQLiteFile(FileBase):
 
 
     def table_info(self, tbl_name):
-        return self.read_sql('PRAGMA table_info(%s)' % tbl_name.split('.')[-1])
+        return self.read_sql(
+            'PRAGMA table_info(%s)' % tbl_name.split('.')[-1]
+            )
 
 
     def data_types(self, tbl_name):
@@ -169,14 +172,14 @@ class SQLiteFile(FileBase):
 
 
     def df_to_table(
-            self,
-            tbl_name,
-            df,
-            chunksize=0,
-            clear_tbl=False,
-            where_cols=None,
-            where_logic=''
-            ):
+        self,
+        tbl_name,
+        df,
+        chunksize=0,
+        clear_tbl=False,
+        where_cols=None,
+        where_logic=''
+        ):
 
         def to_table(df):
             payload = self.format_payload(tbl_name, col_names, df.values)

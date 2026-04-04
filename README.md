@@ -7,7 +7,7 @@
 
 </div>
 
-`pathpilot` is a Python package that makes file and folder manipulation simple and intuitive. It was designed with an emphasis on `pandas` compatibility to ensure smooth workflows.
+`pathpilot` is a Python package that makes file and folder manipulation simple and intuitive.
 
 
 ## Installation
@@ -17,12 +17,12 @@ pip install pathpilot
 
 
 ## Main Features
-- `file_factory` ➔ Function that assigns new file instances to the correct child class. Many file types are supported natively including: *.xlsx*, *.csv*, *.txt*, *.pickle*, etc. The mapping of file extensions to their respective classes is managed using the `extension_mapping` global dictionary. Unmapped extensions are assigned to the `FileBase` class.
-- `Folder` ➔ Class for interacting with folders. It is important to be mindful of the `read_only` parameter which, if set to `True`, allows folders to be created or deleted programically.
+- `file_factory` → Function that routes new file instances to the appropriate child class. Some file types are supported natively such as: *.xlsx*, *.csv*, *.txt*, *.parquet*, etc. The mapping of file extensions to their child class counterparts is managed using the `config.extension_mapping` dictionary. Unmapped extensions are routed to the `File` base class by default.
+- `Folder` → Class that handles folder operations. It is important to be mindful of the `read_only` parameter which, if `True`, allows folders to be created or deleted.
 
 
 ## Example Usage
-Please note the examples below represent a small fraction of the functionality offered by `pathpilot`. Please refer to the documentation within the code for more information.
+Please note the examples below represent a small fraction of the functionality offered by `pathpilot`. Please refer to the intra-code documentation more information.
 
 ### Imports
 ```python
@@ -30,31 +30,31 @@ from pathpilot import Folder, file_factory
 ```
 
 ### Folders
-First, we create an instance of the `Folder` class. Passing `read_only=False` causes the folder to be created if it does not already exist.
+Create a `Folder` instance. Passing `read_only=False` will create the folder if it does not already exist.
 ```python
 # initiate a folder instance
 folder = Folder(r'C:\Users\MyID\Documents\MyFolder', read_only=False)
 ```
 
-Moreover, any subfolders that are referenced while interacting with the folder instance will also be created automatically. Let's use the `join` method to create a couple subfolders.
+The `join` method is used to access subfolders. If `read_only=False`, the subfolders are created automatically.
 ```python
 # create subfolders (i.e. C:\Users\MyID\Documents\MyFolder\Year\2025\Month\)
 month_folder = folder.join('Year', '2025', 'Month')
 ```
 
-Alternatively, you can access subfolders by referencing attributes that may or may not already exist.
+Alternatively, you can access subfolders by attribute.
 ```python
 # create a new subfolder called "January" by accessing it via attribute
 january_folder = month_folder.january
 ```
 
-Joining to a file will return a file object instead.
+Joining to a file name will return a file object instead.
 ```python
 new_years_file = january_folder.join('Happy New Year.txt')
 ```
 
 ### Files
-First, we create an instance of the `ExcelFile` class using the `file_factory` function. This occurs automatically by virtue of the `.xlsx` file extension.
+Create an instance of the `ExcelFile` class using the `file_factory` function. This occurs automatically by virtue of the `.xlsx` file extension.
 ```python
 # create ExcelFile instance
 file = file_factory(r'C:\Users\MyID\Documents\MyFolder\MyFile.xlsx')
@@ -68,9 +68,9 @@ if not file.exists:
   file.save(df)
 ```
 <pre>
-Creating MyFile.xlsx
-        writing 72.00 B to 'Sheet1' tab... DONE
-        writing 80.00 B to 'Sheet1' tab... DONE
+MyFile.xlsx:
+    • Wrote 72.00 B to sheet 'Sheet1' in 0.0 seconds.
+    • Wrote 80.00 B to sheet 'Sheet1' in 0.0 seconds.
 </pre>
 
 Now let's read the file we created as a `DataFrame`.

@@ -26,8 +26,8 @@ def backup_folder(
     destination : str | Folder
         backup folder
     overwrite : bool
-        if True, if the destination file already exists and it is different than
-                 the origin file, it will be overwritten.
+        if True, if the destination file already exists and it is different
+            than the origin file, it will be overwritten.
         If False, overlapping files are ignored.
     shallow : bool
         filecmp.cmp(f1, f2, shallow=True) shallow argument.
@@ -46,12 +46,16 @@ def backup_folder(
 
     def format_path(path):
         path = str(path).replace('\\','/')
-        if path[-1] != '/': path = path + '/'
+        if path[-1] != '/':
+            path = path + '/'
         return path
+
 
     origin = format_path(origin)
     destination = format_path(destination)
-    if not os.path.exists(destination): os.mkdir(destination)
+
+    if not os.path.exists(destination):
+        os.mkdir(destination)
 
     for path, folders, files in os.walk(origin):
         from_path = format_path(path)
@@ -78,7 +82,8 @@ def backup_folder(
             if copy_file:
                 try:
                     shutil.copyfile(from_file, to_file)
-                    if verbose: print(f'{action}: {text}')
+                    if verbose:
+                        print(f'{action}: {text}')
                 except Exception as e:
                     if verbose: print(e)
 
@@ -87,4 +92,5 @@ def backup_folder(
             text = to_folder.replace(destination, '/') + '/'
             if not os.path.exists(to_folder):
                 os.mkdir(to_folder)
-                if verbose: print(f'BackingUp: {text}')
+                if verbose:
+                    print(f'BackingUp: {text}')

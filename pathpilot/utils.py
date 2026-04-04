@@ -1,61 +1,89 @@
 import os
 import datetime
+from functools import wraps
+
 import clockwork as cw
 
 
 def split_extension(x):
-    ''' separates file extention from rest of string '''
+    ''' separates file extention from the rest of the string '''
     dot_index = x.rfind('.')
-    if dot_index == -1: # period not found
-        return x, ''
+
+    # period not found
+    if dot_index == -1:
+        rest, ext = x, ''
     else:
-        ext = x[dot_index + 1:]
         rest = x[:dot_index]
-        return rest, ext
+        ext = x[dot_index + 1:]
+
+    return rest, ext
 
 
-def is_file(f):
-    ''' returns True if the argument is a file '''
-    return bool(trifurcate(f)[-1])
+def is_file(path):
+    ''' returns True if the path is a file '''
+    return bool(trifurcate(path)[-1])
 
 
-def is_folder(f):
-    ''' returns True if the argument is a folder '''
-    f = trifurcate(f)
-    return f[0] and not any(f[1:])
+def is_folder(path):
+    ''' returns True if the path is a folder '''
+    parts = trifurcate(path)
+    return parts[0] and not any(parts[1:])
 
 
-def trifurcate_and_join(f):
-    ''' split argument into its components (folder inferred if absent) and
+def trifurcate_and_join(path):
+    ''' split path into its components (folder inferred if absent) and
         combine them into one string '''
-    folder, name, ext = trifurcate(f)
-    return (folder + name + '.' + ext) if ext else folder
+    folder, name, ext = trifurcate(path)
+    return f'{folder}{name}.{ext}' if ext else folder
 
 
-def trifurcate(f, default_folder=True):
-    ''' split argument into folder, file name, and file extension components '''
-    f = str(f).replace('\\','/').strip()
-    if not f: raise ValueError("'f' argument cannot be empty")
-    explicitly_folder = f[-1] == '/'
-    f = '/'.join([x for x in f.split('/') if x])
-    f = f + '/' if explicitly_folder or '.' not in f.split('/')[-1] else f
-    if f.split('/')[0][-4:].lower() == '.com': f = '//' + f
-    f = f.rsplit('/', 1)
-    folder = f[0] + '/' if len(f) == 2 else \
-        (get_cwd() if default_folder else '')
-    name, ext = split_extension(f[-1])
+def trifurcate(path, default_folder=True):
+    ''' split path into folder, file name, and file extension components '''
+    sep = '/'
+    path = str(path).replace('\\', sep).strip()
+
+    if not path:
+        raise ValueError(
+            "'path' argument cannot be empty."
+            )
+
+    is_dir = path[-1] == sep
+    path = sep.join([x for x in path.split(sep) if x])
+
+    if is_dir or '.' not in path.split(sep)[-1]:
+        path += sep
+
+    if path.split(sep)[0][-4:].lower() == '.com':
+        path = sep * 2 + path
+
+    path = path.rsplit(sep, 1)
+
+    folder = (
+        path[0] + sep
+        if len(path) == 2
+        else (get_cwd() if default_folder else '')
+        )
+
+    name, ext = split_extension(path[-1])
     return folder, name, ext.lower()
 
 
 def get_cwd():
     pypath = os.getenv('PYTHONPATH')
-    f = os.getcwd() if pypath is None else pypath.split(os.pathsep)[0]
-    f = str(f).replace('\\','/') + '/'
-    return f
+
+    path = str(
+        os.getcwd()
+        if pypath is None
+        else pypath.split(os.pathsep)[0]
+        )
+
+    path = path.replace('\\','/') + '/'
+    return path
 
 
 def _to_timestamp(func):
 
+    @wraps(func)
     def wrapper(path):
         letter = func.__name__.split('_')[1][0]
         ts = getattr(os.path, f'get{letter}time')(path)

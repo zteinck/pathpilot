@@ -1,25 +1,21 @@
-import zipfile
 import shutil
 
-from .._folder import Folder
-from ..utils import is_file, is_folder
-from .base import FileBase
+import zipfile as zf
+
+from ..base import File
+from ..._folder import Folder
+from ...decorators import check_read_only
+from ...utils import is_file, is_folder
 
 
-class ZipFile(FileBase):
-    '''
-    Description
-    --------------------
-    while FileBase allows you to zip individual files, this subclass'
-    self.zip supports zipping multiple files and folders.
-    '''
+class ZipFile(File):
 
     #╭-------------------------------------------------------------------------╮
     #| Initialize Instance                                                     |
     #╰-------------------------------------------------------------------------╯
 
-    def __init__(self, f, **kwargs):
-        super().__init__(f, **kwargs)
+    def __init__(self, path, **kwargs):
+        super().__init__(path, **kwargs)
 
 
     #╭-------------------------------------------------------------------------╮
@@ -30,32 +26,31 @@ class ZipFile(FileBase):
         self.zip(*args, **kwargs)
 
 
+    @check_read_only
     def zip(
         self,
-        payload,
-        delete_original=False,
+        paths,
+        delete_source=False,
         filter_func=None,
         include_folders=False,
         files_only=False,
-        verbose=False
         ):
         '''
         Description
         ------------
-        While FileBase allows you to zip individual files, this subclass's
-        zip() method supports zipping multiple files and folders.
+        Zips one or more files and folders.
 
         Parameters
         ------------
-        payload : str | list | tuple | FileBase | Folder
-            String representing a single file or folder or a list or tuple
-            comprised of string, FileBase, or Folder objects representing
+        paths : str | list | tuple | File | Folder
+            String representing a single file or folder path or a list or
+            tuple comprised of string, File, or Folder objects representing
             files and folders to be zipped.
-        delete_original : bool
-            If True, zipped files/folders are deleted after being zipped
+        delete_source : bool
+            If True, source files and folders are deleted after being zipped.
         filter_func : callable
             Function applied to every file in the folder (argument will be of
-            type FileBase). If filter_func returns True for a given file it
+            type File). If filter_func returns True for a given file it
             will be included in the zip process otherwise excluded (e.g.
             filters out files that are not of file extention .py lambda x:
             x.ext == 'py').
@@ -68,11 +63,8 @@ class ZipFile(FileBase):
             if True, zip folder will only include individual files, folders
             are disregarded. For example, if you pass a folder that contains
             subfolders, all the individual files will be zipped and subfolders
-            are discarded.
-            This is the default behavior when 'payload' contains files. This
-            argument cannot be True when include_folder is True.
-        verbose : bool
-            If True, file names are printed after being zipped
+            are discarded. This is the default behavior when 'paths' contains
+            files. This argument cannot be True when include_folder is True.
 
         Returns
         ------------
@@ -80,7 +72,7 @@ class ZipFile(FileBase):
 
         Example:
         ------------
-        payload = [
+        paths = [
             'C:/Folder A/File 1.txt',
             'C:/Folder B/File 2.txt',
             'C:/Folder C/'
@@ -130,36 +122,55 @@ class ZipFile(FileBase):
                     x = Folder(x, read_only=True)
                 else:
                     raise TypeError(
-                        f"payload string is not a file or folder: '{x}'"
+                        f'paths string is not a file or folder path: {x!r}'
                         )
 
-            if isinstance(x, (FileBase, Folder)):
-                if x.exists: return x
-                raise ValueError(f"payload argument does not exist: '{x}'")
+            if isinstance(x, (File, Folder)):
+                if x.exists:
+                    return x
+                else:
+                    raise ValueError(
+                        f'paths argument does not exist:\n{x.path}'
+                        )
 
             raise TypeError(
-                f"invalid payload argument type: '{type(x).__name__}'"
+                f'Invalid paths argument type: <{type(x).__name__}>'
                 )
 
 
-        def zip_file(f, p):
-            if filter_func and not filter_func(f):
+        def write_file(file, hierarchy):
+            if filter_func and not filter_func(file):
                 return False
 
             if files_only:
-                arcname = f.name_ext
+                arcname = file.name_ext
             else:
-                if not include_folders: p = p[1:]
-                arcname = '/'.join(p + [f.name_ext])
+                if not include_folders:
+                    hierarchy = hierarchy[1:]
 
-            zip_obj.write(f.path, arcname=arcname)
-            if delete_original: f.delete()
-            if verbose: print(f'\t• {arcname}')
+                arcname = '/'.join([
+                    *hierarchy,
+                    file.name_ext
+                    ])
+
+            zip_file.write(
+                filename=file.path,
+                arcname=arcname
+                )
+
+            if delete_source:
+                file.delete()
+
+            if self.verbose:
+                print(' ' * 4 + f'• {arcname}')
+
             return True
 
 
         if self.ext != 'zip':
-            raise Exception(f"file '{self.name_ext}' is not a zip file")
+            raise Exception(
+                f'File is not a zip file: {self.name_ext!r}'
+                )
 
         if include_folders and files_only:
             raise ValueError(
@@ -167,30 +178,60 @@ class ZipFile(FileBase):
                 "arguments cannot both be True."
                 )
 
-        if not isinstance(payload, (list, tuple)):
-            payload = [payload]
+        if not isinstance(paths, (list, tuple)):
+            paths = [paths]
 
-        payload = list(map(to_object, payload))
-        zip_obj = zipfile.ZipFile(self.path, 'w', zipfile.ZIP_DEFLATED)
+        paths = list(map(to_object, paths))
 
-        if verbose:
+        zip_file = zf.ZipFile(
+            file=self.path,
+            mode='w',
+            compression=zf.ZIP_DEFLATED
+            )
+
+        if self.verbose:
             print('Zipping:')
 
-        for obj in payload:
-            if isinstance(obj, FileBase):
-                zip_file(obj, [obj.folder.name])
+        for obj in paths:
+            if isinstance(obj, File):
+                write_file(obj, [obj.folder.name])
             else:
-                folder_can_be_deleted = True
+                folder_deletable = True
 
-                for f in obj.walk():
-                    p = f.directory[:-1]\
-                        .replace(obj.parent.path, '')\
+                for file in obj.walk():
+                    hierarchy = (
+                        file
+                        .directory[:-1]
+                        .replace(obj.parent.path, '')
                         .split('/')
+                        )
 
-                    zipped = zip_file(f, p)
+                    zipped = write_file(file, hierarchy)
 
                     if not zipped:
-                        folder_can_be_deleted = False
+                        folder_deletable = False
 
-                if delete_original and folder_can_be_deleted:
+                if delete_source and folder_deletable:
                     shutil.rmtree(obj.path)
+
+
+    @check_read_only
+    def unzip(self, folder=None, delete_source=False):
+        ''' unzips file '''
+
+        folder = (
+            self.directory
+            if folder is None
+            else str(folder)
+            )
+
+        zip_file = zf.ZipFile(
+            file=self.path,
+            mode='r'
+            )
+
+        with zip_file as z:
+            z.extractall(path=folder)
+
+        if delete_source:
+            self.delete()

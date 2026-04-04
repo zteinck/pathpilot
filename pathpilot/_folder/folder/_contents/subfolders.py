@@ -1,29 +1,31 @@
-import pandas as pd
-import oddments as odd
-
-from .base import FileBase
+from .base import FolderContents
+from ...utils import is_folder
 
 
-class CSVFile(FileBase):
+class Subfolders(FolderContents):
+    '''
+    Description
+    --------------------
+    Performs operations on all subfolders as a unified group.
+    '''
 
     #╭-------------------------------------------------------------------------╮
     #| Initialize Instance                                                     |
     #╰-------------------------------------------------------------------------╯
 
-    def __init__(self, f, **kwargs):
-        super().__init__(f, **kwargs)
+    def __init__(self, folder):
+        super().__init__(folder)
 
 
     #╭-------------------------------------------------------------------------╮
     #| Instance Methods                                                        |
     #╰-------------------------------------------------------------------------╯
 
-    @odd.purge_whitespace
-    def read(self, **kwargs):
-        kwargs.setdefault('encoding', 'ISO-8859-1')
-        kwargs.setdefault('keep_default_na', False)
-        return pd.read_csv(self.path, **kwargs)
+    def _to_list(self):
+        return filter(is_folder, self.folder)
 
 
-    def _save(self, obj, **kwargs):
-        obj.to_csv(self.path, **kwargs)
+    def delete(self):
+        for folder in self:
+            folder.delete()
+        self.folder._clear_subfolder_cache()

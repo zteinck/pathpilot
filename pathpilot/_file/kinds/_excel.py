@@ -2,18 +2,24 @@ from collections import OrderedDict
 from functools import cached_property
 from copy import deepcopy
 import datetime
+import time
 import sys
 import re
+
+import polars as pl
+import polars.selectors as cs
 import pandas as pd
 import numpy as np
 import oddments as odd
 from cachegrab import sha256
+from clockwork import format_duration
 
-from .base import FileBase
-from .utils import get_size_label
+from ..base import DfDispatchFile
+from ..utils import get_size_label
+from .._utils import _is_frame
 
 
-class ExcelFile(FileBase):
+class ExcelFile(DfDispatchFile):
     '''
     Description
     --------------------
@@ -52,9 +58,6 @@ class ExcelFile(FileBase):
         'MyTab' would be appear as '1 - MyTab' in the workbook.
     page : int
         keeps track of the current tab number
-    verbose : bool
-        if True, information is printed when a worksheet is created or written
-        to.
 
     Note:
     --------------------
@@ -69,17 +72,168 @@ class ExcelFile(FileBase):
 
     def __init__(
         self,
-        f,
+        path,
         number_tabs=False,
-        verbose=True,
         **kwargs
         ):
-        super().__init__(f, **kwargs)
-        self.format_cache = dict()
-        self.sheet_cache = dict()
+        super().__init__(path, **kwargs)
+        self.format_cache = {}
+        self.sheet_cache = {}
         self.number_tabs = number_tabs
-        self.verbose = verbose
         self.page = 0
+
+
+    #╭-------------------------------------------------------------------------╮
+    #| Magic Methods                                                           |
+    #╰-------------------------------------------------------------------------╯
+
+    def __getattr__(self, name):
+        '''
+        Description
+        ------------
+        Called when an attribute is referenced that does not exist. In this
+        case, attributes that do not exist will be assumed to be active
+        worksheet object attributes (e.g. '.hide_gridlines').
+
+        Parameters
+        ------------
+        name : str
+            xlsxwriter.worksheet.Worksheet attribute name
+
+        Returns
+        ------------
+        out : any
+            xlsxwriter.worksheet.Worksheet attribute
+        '''
+        return getattr(self.active_sheet, name)
+
+
+    def __getitem__(self, key):
+        '''
+        Description
+        ------------
+        Indexing and slicing is applied to existing worksheets.
+
+        Parameters
+        ------------
+        key : int | slice | str
+            • if int or slice, applied to list of worksheet objects
+            • if str, treated like a sheet_cache key (i.e. sheet name)
+
+        Returns
+        ------------
+        out : xlsxwriter.worksheet.Worksheet | list
+             one or more worksheet objects
+        '''
+
+        odd.validate_value(
+            value=key,
+            name='key',
+            types=(int, slice, str)
+            )
+
+        if isinstance(key, (int, slice)):
+            return self.sheets[key]
+        elif isinstance(key, str):
+            return self.sheet_cache[key]
+        else:
+            raise TypeError
+
+
+    def __iter__(self):
+        ''' iterate through worksheet objects '''
+        for key, sheet in self.sheet_cache.items():
+            yield key, sheet
+
+
+    def __contains__(self, key):
+        ''' returns True if worksheet exists in workbook '''
+        return key in self.sheet_cache
+
+
+    #╭-------------------------------------------------------------------------╮
+    #| Classes                                                                 |
+    #╰-------------------------------------------------------------------------╯
+
+    class WriteTimer(object):
+
+        def __init__(self, parent):
+            self._parent = parent
+            self._reset()
+
+
+        @property
+        def start_time(self):
+            return self._start_time
+
+
+        @property
+        def stop_time(self):
+            return self._stop_time
+
+
+        @property
+        def sheet_name(self):
+            return self._sheet_name
+
+
+        @property
+        def size_label(self):
+            return self._size_label
+
+
+        @property
+        def size_to_sheet(self):
+            return f'{self.size_label} to sheet {self.sheet_name!r}'
+
+
+        @property
+        def duration(self):
+            return self.stop_time - self.start_time
+
+
+        @property
+        def duration_label(self):
+            return format_duration(self.duration)
+
+
+        def _reset(self):
+            self._start_time = None
+            self._stop_time = None
+            self._sheet_name = None
+            self._size_label = None
+
+
+        def _print_status(self, status):
+            status = ' ' * 4 + f'• {status}'
+
+            if self._stop_time is None:
+                print(status, end='\r')
+            else:
+                print(status + '\033[K')
+
+
+        def start(self, size):
+            self._start_time = time.time()
+            self._size_label = get_size_label(size)
+            self._sheet_name = self._parent.active_sheet.name
+            self._print_status(f'Writing {self.size_to_sheet}...')
+
+
+        def stop(self, status=None):
+            self._stop_time = time.time()
+            self._print_status(
+                status or
+                f'Wrote {self.size_to_sheet} in {self.duration_label}.'
+                )
+            self._reset()
+
+
+        def abort(self):
+            self.stop(
+                f'Aborted writing to {self.sheet_name!r} '
+                'since data is empty.'
+                )
 
 
     #╭-------------------------------------------------------------------------╮
@@ -128,6 +282,7 @@ class ExcelFile(FileBase):
         out : tuple
             zero-based numbering row and column index (e.g. (0, 0)).
         '''
+
         if isinstance(start_cell, (tuple, list)):
             col, row = start_cell
             if isinstance(col, int):
@@ -143,7 +298,7 @@ class ExcelFile(FileBase):
 
         else:
             raise TypeError(
-                "start_cell must be of type 'str' or 'tuple', got: "
+                "'start_cell' must be of type 'str' or 'tuple', got: "
                 f"{type(start_cell).__name__}"
                 )
 
@@ -151,7 +306,7 @@ class ExcelFile(FileBase):
 
         if row < 0 or col < 0:
             raise ValueError(
-                f"invalid start_cell argument {start_cell}. "
+                f"Invalid 'start_cell' argument: {start_cell}. "
                 "Zero-based indices are not allowed."
                 )
 
@@ -165,56 +320,20 @@ class ExcelFile(FileBase):
 
 
     #╭-------------------------------------------------------------------------╮
-    #| Properties                                                              |
+    #| Cached Properties                                                       |
     #╰-------------------------------------------------------------------------╯
-
-    @property
-    def workbook(self):
-        return self.writer.book
-
-
-    @property
-    def sheet_names(self):
-        ''' list of the actual sheet names '''
-        return [sheet.name for sheet in self.sheets]
-
-
-    @property
-    def sheet_name_map(self):
-        ''' dictionary mapping user's worksheet names to their truncated
-            counterparts '''
-        return {k: v.name for k, v in self.sheet_cache.items()}
-
-
-    @property
-    def sheets(self):
-        ''' list of worksheet objects '''
-        return list(self.sheet_cache.values())
-
 
     @cached_property
     def writer(self):
-        if self.verbose: print(f'\nCreating {self.name_ext}')
+        if self.verbose:
+            print(self.name_ext + ':')
+
         return pd.ExcelWriter(self.path)
 
 
-    @property
-    def active_sheet(self):
-        ''' current active worksheet '''
-        # used __dict__ because hasattr calls __getattr__
-        # when attr not found in __dict__
-        if '_active_sheet' not in self.__dict__:
-            self.create_worksheet('Sheet1')
-        return self._active_sheet
-
-
-    @active_sheet.setter
-    @odd.validate_setter(types=str, call_func=True)
-    def active_sheet(self, value):
-        if value in self.sheet_cache:
-            self._active_sheet = self.sheet_cache[value]
-        else:
-            self.create_worksheet(value)
+    @cached_property
+    def write_timer(self):
+        return self.WriteTimer(self)
 
 
     @cached_property
@@ -318,131 +437,59 @@ class ExcelFile(FileBase):
 
 
     #╭-------------------------------------------------------------------------╮
-    #| Magic Methods                                                           |
+    #| Properties                                                              |
     #╰-------------------------------------------------------------------------╯
 
-    def __getattr__(self, name):
-        '''
-        Description
-        ------------
-        Called when an attribute is referenced that does not exist. In this
-        case, attributes that do not exist will be assumed to be active
-        worksheet object attributes (e.g. '.hide_gridlines').
-
-        Parameters
-        ------------
-        name : str
-            xlsxwriter.worksheet.Worksheet attribute name
-
-        Returns
-        ------------
-        out : *
-            xlsxwriter.worksheet.Worksheet attribute
-        '''
-        return getattr(self.active_sheet, name)
+    @property
+    def workbook(self):
+        return self.writer.book
 
 
-    def __getitem__(self, key):
-        '''
-        Description
-        ------------
-        Indexing and slicing is applied to existing worksheets.
+    @property
+    def sheet_names(self):
+        ''' list of the actual sheet names '''
+        return [sheet.name for sheet in self.sheets]
 
-        Parameters
-        ------------
-        key : int | slice | str
-            • if int or slice, applied to list of worksheet objects
-            • if str, treated like a sheet_cache key (i.e. sheet name)
 
-        Returns
-        ------------
-        out : xlsxwriter.worksheet.Worksheet | list
-             one or more worksheet objects
-        '''
-        if isinstance(key, (int, slice)):
-            return self.sheets[key]
-        elif isinstance(key, str):
-            return self.sheet_cache[key]
+    @property
+    def sheet_name_map(self):
+        ''' dictionary mapping user's worksheet names to their truncated
+            counterparts '''
+        return {k: v.name for k, v in self.sheet_cache.items()}
+
+
+    @property
+    def sheets(self):
+        ''' list of worksheet objects '''
+        return list(self.sheet_cache.values())
+
+
+    @property
+    def active_sheet(self):
+        ''' current active worksheet '''
+        # used __dict__ because hasattr calls __getattr__
+        # when attr not found in __dict__
+        if '_active_sheet' not in self.__dict__:
+            self.create_worksheet('Sheet1')
+        return self._active_sheet
+
+
+    @active_sheet.setter
+    @odd.validate_setter(
+        types=str,
+        empty_ok=False,
+        call_func=True,
+        )
+    def active_sheet(self, value):
+        if value in self.sheet_cache:
+            self._active_sheet = self.sheet_cache[value]
         else:
-            raise TypeError(f"Invalid argument type: '{type(key)}'")
-
-
-    def __iter__(self):
-        ''' iterate through worksheet objects '''
-        for key, sheet in self.sheet_cache.items():
-            yield key, sheet
-
-
-    def __contains__(self, key):
-        ''' returns True if worksheet exists in workbook '''
-        return key in self.sheet_cache
+            self.create_worksheet(value)
 
 
     #╭-------------------------------------------------------------------------╮
     #| Instance Methods                                                        |
     #╰-------------------------------------------------------------------------╯
-
-    @odd.purge_whitespace
-    def read(self, **kwargs):
-        kwargs.setdefault('keep_default_na', False)
-        return pd.read_excel(self.path, **kwargs)
-
-
-    def _save(self, args=None, sheets=None, **kwargs):
-        '''
-        Description
-        ------------
-        Creates the excel file.
-
-        Parameters
-        ------------
-        args : pd.DataFrame | list | dict
-            • if list, each dataframe in the list is written to a separate
-                worksheet.
-            • if dict, the keys are considered sheet names and the values
-                should be DataFrames. (i.e. {'My Sheet 1': df1, 'My Sheet 2':
-                df2}). You may not pass a sheets argument when passing a
-                dictionary as the args argument.
-        sheets : list | str | None
-            Mist of sheet names. Must be None when 'args' is a dictionary.
-        kwargs : dict
-            keyword arguments passed to write_df() method.
-
-        Returns
-        ------------
-        None
-        '''
-
-        if args is not None:
-
-            if isinstance(args, dict):
-                if sheets is not None:
-                    raise ValueError(
-                        "'sheets' argument must be None "
-                        "when a dictionary is passed"
-                        )
-                sheets = list(args.keys())
-                args = list(args.values())
-            else:
-                args = odd.ensure_list(args)
-
-            if sheets is not None:
-                sheets = odd.ensure_list(sheets)
-                if len(args) != len(sheets):
-                    raise ValueError(
-                        f"length of 'args' ({len(args)}) != length of 'sheets' "
-                        f"({len(sheets)})."
-                        )
-
-            for i, arg in enumerate(args):
-                self.write_df(
-                    df=arg,
-                    sheet=sheets[i] if sheets else f'Sheet{i + 1}',
-                    **kwargs
-                    )
-
-        self.writer.close()
-
 
     def create_worksheet(self, name):
         ''' create a new worksheet and set it as the active worksheet '''
@@ -488,7 +535,7 @@ class ExcelFile(FileBase):
         '''
         Description
         ------------
-        writes data to a worksheet
+        Writes data to a worksheet.
 
         Parameters
         ------------
@@ -504,24 +551,24 @@ class ExcelFile(FileBase):
             'c', respectively.
         formatting : str | dict | list(1D) | tuple(1D) | None
             Excel formatting to be applied to data. Supported types include:
-                • str ➜ Strings are interpreted as self.formats dictionary
+                • str → Strings are interpreted as self.formats dictionary
                     keys. Passing a single string (e.g. formatting='bold')
                     causes the corresponding format to be be universally
                     applied to all data cells.
-                • dict ➜ Dictionaries are interpreted as format parameters.
+                • dict → Dictionaries are interpreted as format parameters.
                     Passing a single dictionary (e.g. formatting = {'bold':
                     True, 'num_format': '#,##0'}) causes the corresponding
                     format to be be universally applied to all data cells.
-                • list | tuple ➜ formats included in a list/tuuple are applied
+                • list | tuple → formats included in a list/tuuple are applied
                     to columns in sequential order. If the length of the list
                     or tuple is shorter than the number of columns then no
                     format is applied to the remaining columns.
-                • None ➜ no formatting is applied.
+                • None → no formatting is applied.
         inverse : bool
             If True, the 2D data is inverted such that each sub-list is
             treated as column data as opposed to row data under the default
             behavior. For example:
-            [[1, 2, 3], ['a', 'b', 'c']] ➜ [[1, 'a'], [2, 'b'], [3, 'c']]
+            [[1, 2, 3], ['a', 'b', 'c']] → [[1, 'a'], [2, 'b'], [3, 'c']]
         repeat : int
             If 'data' argument is a single data element then it will be repeated
             or duplicated this number of times.
@@ -577,8 +624,8 @@ class ExcelFile(FileBase):
         if sheet is not None:
             self.active_sheet = sheet
 
-        if isinstance(data, (pd.DataFrame, pd.Series)):
-            self.write_df(
+        if _is_frame(data):
+            self.write_frame(
                 df=data,
                 sheet=sheet,
                 start_cell=start_cell,
@@ -587,19 +634,17 @@ class ExcelFile(FileBase):
                 repeat=repeat,
                 outer_border=outer_border,
                 )
+
             return
 
         if self.verbose:
-             size_label = get_size_label(sys.getsizeof(data))
-             print(
-                f'\twriting {size_label} to '
-                f'{self.active_sheet.name!r} tab',
-                end='... '
+            self.write_timer.start(
+                size=sys.getsizeof(data)
                 )
 
         if not data:
             if self.verbose:
-                print('SKIPPED')
+                self.write_timer.abort()
             return
 
         start_col, start_row = self.parse_start_cell(start_cell)
@@ -610,34 +655,40 @@ class ExcelFile(FileBase):
             # data is non-iterable
             data = [[data] * (repeat or 1)]
         else:
-            if repeat: raise NotImplementedError
+            if repeat:
+                raise NotImplementedError
             # data is a one-dimensional iterable
             if not is_iter(data[0]):
                 data = [data]
 
-        if inverse: data = list(zip(*data))
+        if inverse:
+            data = list(zip(*data))
 
         n_rows, n_cols = np.shape(data)
 
-        formatting = list(map(process_format, formatting)) + \
-                    ([None] * (n_cols - len(formatting))) \
-                    if is_iter(formatting) \
-                    else [process_format(formatting)] * n_cols
+        formatting = (
+            [
+            *list(map(process_format, formatting)),
+            *([None] * (n_cols - len(formatting))),
+            ]
+            if is_iter(formatting)
+            else [process_format(formatting)] * n_cols
+            )
 
         for row_idx, row in enumerate(data):
             for col_idx, cell in enumerate(row):
                 self.active_sheet.write(
                     start_row + row_idx,
                     start_col + col_idx,
-                    cell if pd.notnull(cell) else None,
+                    None if pd.isna(cell) else cell,
                     format_builder(col_idx, row_idx)
                     )
 
         if self.verbose:
-            print('DONE')
+            self.write_timer.stop()
 
 
-    def write_df(
+    def write_frame(
         self,
         df,
         sheet=None,
@@ -677,9 +728,9 @@ class ExcelFile(FileBase):
             See self.write 'formatting' argument documentation.
         data_format : ↑
             Special cases:
-            • 'auto' ➜ formatting is automatically applied to numeric, percent,
+            • 'auto' → formatting is automatically applied to numeric, percent,
                 and date fields.
-            • dict ➜ if the dictionary keys are only comprised of 'df' index or
+            • dict → if the dictionary keys are only comprised of 'df' index or
                 column names then the values are treated like format parameters
                 and formatting is only applied to those columns included in the
                 keys. If not all the key values are column names then the
@@ -689,23 +740,23 @@ class ExcelFile(FileBase):
             Other cases:
                 see self.write 'formatting' argument documentation.
         column_widths : 'auto' | list | tuple | dict
-            • 'auto' ➜ xlsxwriter does not support auto-fitting column widths
+            • 'auto' → xlsxwriter does not support auto-fitting column widths
                 so this attempts replicate it by setting the column width
                 according to the length of the values in each column (up to a
                 certain limit).
-            • list | tuple ➜ widths are applied to columns in sequential order.
+            • list | tuple → widths are applied to columns in sequential order.
                 If the length of the list/tuple is shorter than the
                 number of columns then the width is not set on the
                 remaining columns.
-            • dict ➜ dictionary where keys are DataFrame column names and values
+            • dict → dictionary where keys are DataFrame column names and values
                 are column widths. Any column names excluded from the dictionary
                 will not have their widths set.
         date_format : None | str | dict
             Defines how date-like columns are parsed when data_format='auto'
             (e.g. '%Y-%m-%d'). Options include:
-            • None ➜ format is inferred.
-            • str ➜ used for all date-like columns.
-            • dict ➜ dictionary where keys are DataFrame column names and values
+            • None → format is inferred.
+            • str → used for all date-like columns.
+            • dict → dictionary where keys are DataFrame column names and values
                 are formats. Any column names excluded from the dictionary
                 default to None.
         normalize : bool
@@ -738,7 +789,7 @@ class ExcelFile(FileBase):
         None
         '''
 
-        df = odd.coerce_dataframe(df)
+        df = odd.to_pandas_frame(df)
 
         odd.validate_value(
             value=date_format,
@@ -770,7 +821,7 @@ class ExcelFile(FileBase):
             total_column = False
 
         # Check for duplicate column names
-        odd.verify_unique(df, column_names=True)
+        odd.assert_unique(df, column_names=True)
 
         # Add a total column to dataframe
         if total_column:
@@ -795,14 +846,18 @@ class ExcelFile(FileBase):
         numeric_columns -= percent_columns
 
         datelike_columns = set(
-            df.select_dtypes(include=[np.datetime64])\
-            .columns.tolist()
+            df
+            .select_dtypes(include=[np.datetime64])
+            .columns
+            .tolist()
             )
 
         for k in df.columns:
-            if isinstance(k, str) \
-            and odd.column_name_is_datelike(k) \
-            and not np.issubdtype(df[k].dtype, np.timedelta64):
+            if (
+                isinstance(k, str)
+                and odd.column_name_is_datelike(k)
+                and not np.issubdtype(df[k].dtype, np.timedelta64)
+                ):
                 datelike_columns.add(k)
 
         # Parse start cell
@@ -912,8 +967,13 @@ class ExcelFile(FileBase):
                 s = df[k].dropna()
                 if s.empty: continue
                 if k in datetime_columns:
-                    if all(x.time() == datetime.time.min for x in s.values):
-                        df[k] = df[k].apply(odd.ignore_nan(lambda x: x.date()))
+                    if all(
+                        x.time() == datetime.time.min
+                        for x in s.values
+                        ):
+                        df[k] = df[k].apply(
+                            odd.ignore_nan(lambda x: x.date())
+                            )
                         data_format[k] = 'date'
                 else:
                     if (s == s.dt.normalize()).all():
@@ -966,10 +1026,18 @@ class ExcelFile(FileBase):
         # Write data
         self.write(
             start_cell=(start_col + 1, start_row + 2),
-            data=df.replace([np.inf, -np.inf], np.nan)\
-                   .where(df.notnull(), None).values.tolist(),
-            formatting=None if data_format is None else \
-                       [data_format.get(k) for k in df.columns],
+            data=(
+                df
+                .replace([np.inf, -np.inf], np.nan)
+                .where(df.notnull(), None)
+                .values
+                .tolist()
+                ),
+            formatting=(
+                None
+                if data_format is None
+                else [data_format.get(k) for k in df.columns]
+                ),
             sheet=sheet,
             **kwargs
             )
@@ -1114,10 +1182,17 @@ class ExcelFile(FileBase):
         cols = [self.get_column_index(x) + 1 for x in cols]
         rows = [int(x) for x in rows]
 
-        build_counter = lambda x: \
-            OrderedDict((i, k) for i, k in enumerate(sorted(list(set(x)))))
+        build_counter = lambda x: (
+            OrderedDict((i, k)
+            for i, k in enumerate(sorted(list(set(x)))))
+            )
 
-        counter = build_counter(rows) if down else build_counter(cols)
+        counter = (
+            build_counter(rows)
+            if down
+            else build_counter(cols)
+            )
+
         inverse_counter = {v: k for k, v in counter.items()}
 
         for c, r in zip(cols, rows):
@@ -1158,21 +1233,21 @@ class ExcelFile(FileBase):
         Parameters
         ------------
         name : str | tuple | list
-            • str ➜ name of new format.
+            • str → name of new format.
                 If 'fmt' is None, if the name is already in self.formats then
                     no action is taken. If the name does not already exist then
                     the name's components (delimited by underscores ('_')) will
                     be combined into a new format (e.g.'bold_commas').
                 if 'fmt' is not None, if the name conflicts with an existing
                     format name, the existing format will be overwritten.
-            • tuple | list ➜ If 'fmt' is None, components will be combined
+            • tuple | list → If 'fmt' is None, components will be combined
                 into a new format. For example, self.add_format(name=
                 ['bold','commas'], fmt=None) would add the following entry to
                 self.formats: {'bold_commas': {'bold': True, 'num_format':
                 '#,##0'}
         fmt : dict | None
-            • dict ➜ see https://xlsxwriter.readthedocs.io/format.html
-            • None ➜ format will be constructed based on the components
+            • dict → see https://xlsxwriter.readthedocs.io/format.html
+            • None → format will be constructed based on the components
 
         Returns
         ------------
@@ -1224,26 +1299,245 @@ class ExcelFile(FileBase):
         Parameters
         ------------
         arg : str | tuple | list | dict | None
-            • str | tuple | list ➜ passed to add_format as 'name' argument.
-            • dict ➜ Format parameters. The resulting format will not be
-                      available in self.formats but it will still be cached and
-                      can be accessed by passing the same dictionary to this
-                      function.
-            • None ➜ None is returned
+            • str | tuple | list → passed to add_format as 'name' argument.
+            • dict → Format parameters. The resulting format will not be
+                available in self.formats but it will still be cached and can
+                be accessed by passing the same dictionary to this function.
+            • None → None is returned
 
         Returns
         ------------
         out : xlsxwriter.format.Format | None
             format object
         '''
-        if not arg: return
+        if not arg:
+            return None
 
         if not isinstance(arg, dict):
             name = self.add_format(name=arg)
             arg = self.formats[name]
 
         key = sha256(str(sorted(list(arg.items()))))
+
         if key not in self.format_cache:
             self.format_cache[key] = self.workbook.add_format(arg)
 
         return self.format_cache[key]
+
+
+    def _read_with_pandas(self, **kwargs):
+        params = {'keep_default_na': False} | kwargs
+        return pd.read_excel(self.path, **params)
+
+
+    def _read_with_polars(self, **kwargs):
+        return pl.read_excel(self.path, **kwargs)
+
+
+    def _save_with_pandas(self, *args, **kwargs):
+        self._save_and_close(*args, **kwargs)
+
+
+    def _save_with_polars(self, *args, **kwargs):
+        self._save_and_close(*args, _df_backend='polars', **kwargs)
+
+
+    def _save_and_close(
+        self,
+        data=None,
+        sheets=None,
+        _df_backend=None,
+        **kwargs
+        ):
+        '''
+        Description
+        ------------
+        Creates the excel file.
+
+        Parameters
+        ------------
+        data : DataFrame | list[DataFrame] | dict[str: DataFrame]
+            • If list, each DataFrame is written to a separate worksheet.
+            • if dict, the keys are considered sheet names and the values
+                should be DataFrames. (i.e. {'My Sheet 1': df1, 'My Sheet 2':
+                df2}).
+        sheets : list | str | None
+            List of sheet names. Must be None when 'data' is a dictionary.
+        _df_backend : None | str
+            Allows a temporary override of 'self.df_backend' when called from
+            a backend-specific method.
+        kwargs : dict
+            Keyword arguments passed to 'write_frame()' method.
+
+        Returns
+        ------------
+        None
+        '''
+
+        _df_backend = _df_backend or self.df_backend
+
+        if data is None:
+            if _df_backend == 'polars':
+                self.touch()
+            else:
+                self.writer.close()
+            return
+
+        if isinstance(data, dict):
+            if sheets is not None:
+                raise ValueError(
+                    "'sheets' argument must be None "
+                    "when 'data' is a dictionary."
+                    )
+            sheets = list(data.keys())
+            data = list(data.values())
+        else:
+            data = odd.ensure_list(data)
+            if sheets is None:
+                sheets = [
+                    f'Sheet{i + 1}'
+                    for i in range(len(data))
+                    ]
+            else:
+                sheets = odd.ensure_list(sheets)
+
+        if _df_backend == 'polars':
+            with self.workbook as workbook:
+                for sheet, df in zip(sheets, data, strict=True):
+                    self.active_sheet = sheet
+                    self._write_polars_frame(
+                        df=df,
+                        workbook=workbook,
+                        worksheet=self.active_sheet,
+                        **kwargs
+                        )
+            return
+
+        for sheet, df in zip(sheets, data, strict=True):
+            self.write_frame(df, sheet, **kwargs)
+
+        self.writer.close()
+
+
+    def _write_polars_frame(self, df, **kwargs):
+        '''
+        Description
+        ------------
+        Implementation of 'write_frame()' using Polars. However, unlike its
+        Pandas counterpart, this method cannot be called directly. Instead, it
+        is invoked when calling 'save(df, df_backend="polars", **kwargs)' or
+        when df_backend="polars" per the global configuration.
+
+        Parameters
+        ------------
+        df : any
+            Object compatible with 'odd.to_polars_frame()'.
+        kwargs : dict
+            Keyword arguments passed to Polars' 'write_excel()' method.
+
+        Returns
+        ------------
+        None
+        '''
+
+        def normalize_if_lossless(df, selector, expr, dtype):
+            ''' casts columns to a simpler type if no data would be lost '''
+
+            # Check if the condition holds for all non-null values, skipping
+            # columns that are entirely null.
+            checks = df.select(
+                (expr.filter(selector.is_not_null()).all())
+                & (selector.is_not_null().any())
+                )
+
+            if checks.is_empty():
+                return df
+
+            # List of columns to cast to a simpler type
+            cols = [
+                col
+                for col in checks.columns
+                if checks[col].item()
+                ]
+
+            if not cols:
+                return df
+
+            # Cast to a simpler type
+            df = df.with_columns(
+                pl.col(cols).cast(dtype)
+                )
+
+            return df
+
+
+        def get_column_formats():
+            ''' build default 'column_formats' argument '''
+            out = {}
+            comma_style = '#,##0'
+
+            for col, dtype in df.schema.items():
+                if not dtype.is_numeric():
+                    continue
+
+                col_fmt = comma_style[:]
+
+                if dtype.is_float():
+                    col_fmt += ('.' + '0' * decimals)
+
+                if '%' in col or 'percent' in col.lower():
+                    col_fmt += '%'
+
+                out[col] = col_fmt
+
+            return out
+
+        # apply default parameters
+        defaults = {
+            'dtype_formats': {pl.Date: 'mm/dd/yyyy'},
+            'float_precision': 2,
+            'autofit': True,
+            }
+
+        params =  defaults | kwargs
+
+        # number of decimals displayed in the Excel file
+        decimals = params['float_precision']
+
+        # convert input to Polars DataFrame
+        df = odd.to_polars_frame(df)
+
+        # cast float columns to integer if all values are whole numbers
+        selector = cs.float()
+
+        df = normalize_if_lossless(
+            df=df,
+            selector=selector,
+            expr=((selector.round(decimals) % 1) == 0),
+            dtype=pl.Int64
+            )
+
+        # cast datetime columns to date if no values have a time component
+        selector = cs.datetime()
+
+        df = normalize_if_lossless(
+            df=df,
+            selector=selector,
+            expr=(selector.dt.time() == datetime.time.min),
+            dtype=pl.Date
+            )
+
+        # apply default column formats
+        key = 'column_formats'
+        default_formats = get_column_formats()
+        params[key] = default_formats | params.get(key, {})
+
+        if self.verbose:
+            self.write_timer.start(
+                size=df.estimated_size(unit='b')
+                )
+
+        df.write_excel(**params)
+
+        if self.verbose:
+            self.write_timer.stop()
