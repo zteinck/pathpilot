@@ -160,6 +160,7 @@ class ExcelFile(DfDispatchFile):
         def __init__(self, parent):
             self._parent = parent
             self._reset()
+            print(parent.name_ext + ':')
 
 
         @property
@@ -325,9 +326,6 @@ class ExcelFile(DfDispatchFile):
 
     @cached_property
     def writer(self):
-        if self.verbose:
-            print(self.name_ext + ':')
-
         return pd.ExcelWriter(self.path)
 
 
@@ -341,7 +339,7 @@ class ExcelFile(DfDispatchFile):
 
         header_body_presets = {
             'text_wrap': True,
-            'border': True,
+            'border': 1,
             'align': 'left',
             'valign': 'top'
             }
@@ -374,14 +372,14 @@ class ExcelFile(DfDispatchFile):
             # 'datetime': {'num_format': 'mm/dd/yyyy hh:mm:ss.000 AM/PM'},
 
             # Border
-            'top': {'top': True},
-            'bottom': {'bottom': True},
-            'left': {'left': True},
-            'right': {'right': True},
+            'top': {'top': 1},
+            'bottom': {'bottom': 1},
+            'left': {'left': 1},
+            'right': {'right': 1},
 
             # Headers
             'pandas_header': {
-                'border': True,
+                'border': 1,
                 'align': 'center',
                 'valign': 'vcenter',
                 'bold': True
@@ -390,7 +388,7 @@ class ExcelFile(DfDispatchFile):
             'black_header': {
                 'text_wrap': True,
                 'fg_color': 'black',
-                'border': True,
+                'border': 1,
                 'align': 'center',
                 'valign': 'vcenter',
                 'bold': True,
@@ -403,13 +401,13 @@ class ExcelFile(DfDispatchFile):
 
             # Miscellaneous
             'default_merge': {
-                'border': True,
+                'border': 1,
                 'align': 'top',
                 'text_wrap': True
                 },
 
             'gold_wrap': {
-                'border': True,
+                'border': 1,
                 'align': 'top',
                 'text_wrap': True,
                 'fg_color': '#FFE265'
@@ -1177,7 +1175,7 @@ class ExcelFile(DfDispatchFile):
             start_cell = start_cell.format(**header_to_column_map)
             formula = formula.format(**header_to_column_map)
 
-        components = list(set(re.findall('([a-zA-Z]+)(\d+)', formula)))
+        components = list(set(re.findall(r'([a-zA-Z]+)(\d+)', formula)))
         cols, rows = zip(*components)
         cols = [self.get_column_index(x) + 1 for x in cols]
         rows = [int(x) for x in rows]
@@ -1268,7 +1266,8 @@ class ExcelFile(DfDispatchFile):
                 )
 
             fmt = dict()
-            for k in name: fmt.update(self.formats[k])
+            for k in name:
+                fmt.update(self.formats[k])
             name = '_'.join(odd.natural_sort(name))
         else:
             if not isinstance(name, str):
@@ -1495,7 +1494,10 @@ class ExcelFile(DfDispatchFile):
         # apply default parameters
         defaults = {
             'dtype_formats': {pl.Date: 'mm/dd/yyyy'},
+            'header_format': self.formats['pandas_header'],
             'float_precision': 2,
+            'include_header': True,
+            'autofilter': True,
             'autofit': True,
             }
 
