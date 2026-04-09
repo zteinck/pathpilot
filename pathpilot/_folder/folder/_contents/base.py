@@ -135,8 +135,7 @@ class FolderContents(object):
         ------------
         name_pattern : str
             If not None, only object names meeting this pattern will be
-            considered candidates. This argument is passed as the
-            pd.Series.str.contains 'pat' argument.
+            considered candidates.
         name_literal
             Determines how 'name_pattern' is interpreted:
                 • True → literal string
@@ -157,17 +156,14 @@ class FolderContents(object):
             There are a few scenarios to consider:
                 • 'date_pattern' is None → an attempt will be made to derive
                     the regex pattern using 'date_format' as the template.
-                • 'date_pattern' is not None → 'date_format' is optional but
-                    it can be included if you do not want to rely on
-                    pd.to_datetime inferring the format.
+                • 'date_pattern' is not None → 'date_format' is optional.
 
             Example:
             ------------
             Dealing with the same example from above, all the following
             combinations will achieve the same result since the None values
             being inferred:
-                • date_pattern=r'\d{4}\-\d{2}\-\d{2}',
-                    date_format='%Y-%m-%d'
+                • date_pattern=r'\d{4}\-\d{2}\-\d{2}', date_format='%Y-%m-%d'
                 • date_pattern=None, date_format='%Y-%m-%d'
                 • date_pattern=r'\d{4}\-\d{2}\-\d{2}', date_format=None
 
