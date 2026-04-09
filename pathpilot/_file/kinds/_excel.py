@@ -1515,7 +1515,7 @@ class ExcelFile(DfDispatchFile):
         df = normalize_if_lossless(
             df=df,
             selector=selector,
-            expr=((selector.round(decimals) % 1) == 0),
+            expr=((selector % 1) == 0),
             dtype=pl.Int64
             )
 
