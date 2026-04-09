@@ -31,7 +31,7 @@ class DfDispatchFile(File):
 
 
     @inject_df_backend
-    def _save(self, obj, df_backend, **kwargs):
+    def _save(self, obj=None, df_backend=None, **kwargs):
 
         if df_backend == 'pandas':
             cast_func = odd.to_pandas_frame
@@ -40,7 +40,7 @@ class DfDispatchFile(File):
             cast_func = odd.to_polars_frame
             save_func = self._save_with_polars
 
-        if _is_frame(obj):
+        if obj is not None and _is_frame(obj):
             obj = cast_func(obj)
 
         save_func(obj, **kwargs)
