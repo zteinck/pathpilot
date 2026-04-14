@@ -25,6 +25,7 @@ class CsvFile(DfDispatchFile):
         defaults = {
             'encoding': 'ISO-8859-1',
             'keep_default_na': False,
+            'na_values': [''],
             }
         params = defaults | kwargs
         return pd.read_csv(self.path, **params)

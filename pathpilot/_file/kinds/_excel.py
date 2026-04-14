@@ -854,7 +854,7 @@ class ExcelFile(DfDispatchFile):
             if (
                 isinstance(k, str)
                 and odd.column_name_is_datelike(k)
-                and not np.issubdtype(df[k].dtype, np.timedelta64)
+                and not pd.api.types.is_timedelta64_dtype(df[k])
                 ):
                 datelike_columns.add(k)
 
@@ -928,8 +928,10 @@ class ExcelFile(DfDispatchFile):
             datetime_columns = set()
 
             for k in list(datelike_columns):
-                if np.issubdtype(df[k].dtype, np.datetime64) \
-                    or df[k].isna().all():
+                if (
+                    pd.api.types.is_datetime64_any_dtype(df[k])
+                    or df[k].isna().all()
+                    ):
                     continue
 
                 fmt = date_formats.get(k)
@@ -1325,7 +1327,11 @@ class ExcelFile(DfDispatchFile):
 
 
     def _read_with_pandas(self, **kwargs):
-        params = {'keep_default_na': False} | kwargs
+        defaults = {
+            'keep_default_na': False,
+            'na_values': [''],
+            }
+        params = defaults | kwargs
         return pd.read_excel(self.path, **params)
 
 
