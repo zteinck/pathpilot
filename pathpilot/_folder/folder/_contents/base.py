@@ -126,7 +126,7 @@ class FolderContents(object):
         descending=True,
         errors='raise',
         ):
-        '''
+        r'''
         Description
         ------------
         Filter folder objects based on user-defined criteria.
