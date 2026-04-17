@@ -1263,7 +1263,6 @@ class ExcelFile(DfDispatchFile):
 
             odd.validate_value(
                 value=name,
-                name=name,
                 types=(tuple, list)
                 )
 
