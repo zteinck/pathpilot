@@ -26,5 +26,5 @@ from .utils import (
     get_modified_date,
     )
 
-__version__ = '0.4.6'
+__version__ = '0.5.0'
 __author__ = 'Zachary Einck <zacharyeinck@gmail.com>'

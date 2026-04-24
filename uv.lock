@@ -202,7 +202,7 @@ wheels = [
 
 [[package]]
 name = "pathpilot"
-version = "0.4.6"
+version = "0.5.0"
 source = { editable = "." }
 dependencies = [
     { name = "cachegrab" },
