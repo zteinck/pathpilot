@@ -7,7 +7,12 @@ from .core import (
 
 from ._folder import *
 from ._file import *
-from .decorators import check_read_only
+
+from .decorators import (
+    check_read_only,
+    assert_exists,
+    )
+
 from .exceptions import ReadOnlyError
 
 from .utils import (
