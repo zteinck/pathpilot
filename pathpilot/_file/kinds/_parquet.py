@@ -1,5 +1,10 @@
 import polars as pl
 
+from ...decorators import (
+    assert_exists,
+    check_read_only,
+    )
+
 from ..base import File
 
 
@@ -17,9 +22,15 @@ class ParquetFile(File):
     #| Instance Methods                                                        |
     #╰-------------------------------------------------------------------------╯
 
+    @assert_exists
     def scan(self, **kwargs):
         lf = pl.scan_parquet(self.path, **kwargs)
         return lf
+
+
+    @check_read_only
+    def sink(self, lf, **kwargs):
+        lf.sink_parquet(self.path, **kwargs)
 
 
     def read(self, **kwargs):

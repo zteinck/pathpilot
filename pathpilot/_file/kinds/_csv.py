@@ -3,7 +3,11 @@ import oddments as odd
 import pandas as pd
 import polars as pl
 
-from ...decorators import check_read_only
+from ...decorators import (
+    assert_exists,
+    check_read_only,
+    )
+
 from ..base import DfDispatchFile
 
 
@@ -20,6 +24,16 @@ class CsvFile(DfDispatchFile):
     #╭-------------------------------------------------------------------------╮
     #| Instance Methods                                                        |
     #╰-------------------------------------------------------------------------╯
+
+    @assert_exists
+    def scan(self, **kwargs):
+        return pl.scan_csv(self.path, **kwargs)
+
+
+    @check_read_only
+    def sink(self, lf, **kwargs):
+        lf.sink_csv(self.path, **kwargs)
+
 
     def _read_with_pandas(self, **kwargs):
         defaults = {
@@ -42,12 +56,3 @@ class CsvFile(DfDispatchFile):
 
     def _save_with_polars(self, obj, **kwargs):
         obj.write_csv(self.path, **kwargs)
-
-
-    def scan(self, **kwargs):
-        return pl.scan_csv(self.path, **kwargs)
-
-
-    @check_read_only
-    def sink(self, lf, **kwargs):
-        lf.sink_csv(self.path, **kwargs)
