@@ -507,6 +507,10 @@ class ExcelFile(DfDispatchFile):
         char_limit = 31
         name = name[:char_limit]
 
+        # Excel forbids certain characters
+        forbidden_chars = {':','\\','/','?','*','[',']'}
+        name = ''.join('-' if x in forbidden_chars else x for x in name)
+
         # ensure truncated sheet names are unique
         sheet_names = set(self.sheet_names)
 
