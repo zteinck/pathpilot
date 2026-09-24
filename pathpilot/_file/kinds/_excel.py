@@ -33,9 +33,9 @@ class ExcelFile(DfDispatchFile):
     --------------------
     writer : ExcelWriter
         pd.ExcelWriter instance
-    active_sheet : xlsxwriter.worksheet.Worksheet
+    _active_sheet : xlsxwriter.worksheet.Worksheet
         The active worksheet
-    sheet_cache : dict
+    _sheet_cache : dict
         Dictionary where the keys are worksheet names and values are the
         worksheet objects. It is important to note that the keys are the
         original sheet names passed by the user as opposed to the actual name
@@ -49,14 +49,14 @@ class ExcelFile(DfDispatchFile):
         {'bold': True}}. These are intended to be frequently used formats that
         can be both used individually and as building blocks for more complex
         formats (see self.add_format for more information.)
-    format_cache : dict
+    _format_cache : dict
         keys are hashes of sorted dictionaries containing format parameters
         and values are xlsxwriter.format.Format. This is done so that only one
         format instance will be created per unique format used.
-    number_tabs : bool
+    _number_tabs : bool
         if True, tabs in the workbook will have a number prefix. For example,
         'MyTab' would be appear as '1 - MyTab' in the workbook.
-    page : int
+    _page : int
         keeps track of the current tab number
 
     Note:
@@ -137,20 +137,20 @@ class ExcelFile(DfDispatchFile):
         if isinstance(key, (int, slice)):
             return self.sheets[key]
         elif isinstance(key, str):
-            return self.sheet_cache[key]
+            return self._sheet_cache[key]
         else:
             raise TypeError
 
 
     def __iter__(self):
         ''' iterate through worksheet objects '''
-        for key, sheet in self.sheet_cache.items():
+        for key, sheet in self._sheet_cache.items():
             yield key, sheet
 
 
     def __contains__(self, key):
         ''' returns True if worksheet exists in workbook '''
-        return key in self.sheet_cache
+        return key in self._sheet_cache
 
 
     #╭-------------------------------------------------------------------------╮
@@ -475,13 +475,13 @@ class ExcelFile(DfDispatchFile):
     def sheet_name_map(self):
         ''' dictionary mapping user's worksheet names to their truncated
             counterparts '''
-        return {k: v.name for k, v in self.sheet_cache.items()}
+        return {k: v.name for k, v in self._sheet_cache.items()}
 
 
     @property
     def sheets(self):
         ''' list of worksheet objects '''
-        return list(self.sheet_cache.values())
+        return list(self._sheet_cache.values())
 
 
     @property
@@ -501,8 +501,8 @@ class ExcelFile(DfDispatchFile):
         call_wrapped=True,
         )
     def active_sheet(self, value):
-        if value in self.sheet_cache:
-            self._active_sheet = self.sheet_cache[value]
+        if value in self._sheet_cache:
+            self._active_sheet = self._sheet_cache[value]
         else:
             self.create_worksheet(value)
 
@@ -524,9 +524,9 @@ class ExcelFile(DfDispatchFile):
 
         key = name[:]
 
-        if key in self.sheet_cache:
+        if key in self._sheet_cache:
             raise ValueError(
-                f"a worksheet with name='{name}' was already created."
+                f'A worksheet with name {name!r} was already created.'
                 )
 
         if self.number_tabs:
@@ -550,7 +550,7 @@ class ExcelFile(DfDispatchFile):
             name = f'{name[:index]}{counter}'
             counter += 1
 
-        self.sheet_cache[key] = self.workbook.add_worksheet(name)
+        self._sheet_cache[key] = self.workbook.add_worksheet(name)
         self.active_sheet = key
 
 
@@ -1354,10 +1354,10 @@ class ExcelFile(DfDispatchFile):
 
         key = sha256(str(sorted(list(arg.items()))))
 
-        if key not in self.format_cache:
-            self.format_cache[key] = self.workbook.add_format(arg)
+        if key not in self._format_cache:
+            self._format_cache[key] = self.workbook.add_format(arg)
 
-        return self.format_cache[key]
+        return self._format_cache[key]
 
 
     def _read_with_pandas(self, **kwargs):
