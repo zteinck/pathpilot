@@ -21,15 +21,11 @@ class TextFile(File):
     def _validate_mode(mode, letter):
         name = 'mode'
 
-        odd.validate_value(
-            value=mode,
-            name=name,
-            types=str,
-            )
+        odd.Validator(types=str).validate(mode, name)
 
         if mode[0] != letter:
             raise ValueError(
-                "'mode' should start with {letter!r}, got: {mode!r}"
+                f'{name!r} should start with {letter!r}, got: {mode!r}'
                 )
 
 

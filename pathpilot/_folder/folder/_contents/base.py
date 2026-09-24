@@ -3,7 +3,7 @@ import clockwork as cw
 import polars as pl
 
 
-class FolderContents(object):
+class FolderContents:
     '''
     Description
     --------------------
@@ -45,7 +45,7 @@ class FolderContents(object):
             'type': pl.Categorical,
             'hash_value': pl.String,
             'path': pl.String,
-            'directory': pl.String,
+            'folder': pl.String,
             'full_name': pl.String,
             'name': pl.String,
             'read_only': pl.Boolean,
@@ -61,6 +61,7 @@ class FolderContents(object):
             }
 
         data = []
+
         for obj in self:
             meta_data = obj.meta_data
             data.append({
@@ -192,7 +193,7 @@ class FolderContents(object):
 
         Returns
         ------------
-        out : pl.DataFrame | pd.DataFrame | Folder | File | None
+        result : pl.DataFrame | pd.DataFrame | Folder | File | None
             If 'index' argument is not None, the corresponding file or
             folder object is returned. Otherwise, the filtered and sorted
             meta data DataFrame is returned. If an error is encountered and
@@ -212,27 +213,36 @@ class FolderContents(object):
             return x if start and end else f'({x})'
 
 
-        odd.validate_value(
-            value=index,
-            name='index',
+        (
+        odd.Validator(
             types=int,
-            none_ok=True
+            allow_none=True,
             )
+        .validate(
+            index=index
+            )
+        )
 
-        odd.validate_value(
-            value=sort_by,
-            name='sort_by',
+        (
+        odd.Validator(
             types=(str, list),
-            none_ok=True,
-            empty_ok=False
+            allow_none=True,
+            allow_empty=False,
             )
+        .validate(
+            sort_by=sort_by
+            )
+        )
 
-        odd.validate_value(
-            value=errors,
-            name='errors',
+        (
+        odd.Validator(
             types=str,
-            whitelist=['raise','ignore']
+            whitelist=['raise','ignore'],
             )
+        .validate(
+            errors=errors
+            )
+        )
 
         if sort_by is None:
             sort_by = ['created_date']
@@ -354,7 +364,7 @@ class FolderContents(object):
     def _to_list(self):
         return [
             *self.folder.folders.to_list(),
-            *self.folder.files.to_list()
+            *self.folder.files.to_list(),
             ]
 
 

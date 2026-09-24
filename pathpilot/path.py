@@ -1,3 +1,4 @@
+from copy import deepcopy
 import os
 
 import oddments as odd
@@ -9,7 +10,7 @@ from .utils import (
     )
 
 
-class Path(object):
+class Path(odd.ReprMixin):
     '''
     Description
     --------------------
@@ -17,13 +18,20 @@ class Path(object):
 
     Class Attributes
     --------------------
-    ...
+    None
 
     Instance Attributes
     --------------------
     _read_only : bool
         If True, creating or deleting paths is disabled.
     '''
+
+    #╭-------------------------------------------------------------------------╮
+    #| Class Attributes                                                        |
+    #╰-------------------------------------------------------------------------╯
+
+    _repr_attrs = ['path', 'read_only']
+
 
     #╭-------------------------------------------------------------------------╮
     #| Initialize Instance                                                     |
@@ -43,9 +51,9 @@ class Path(object):
 
 
     @read_only.setter
-    @odd.validate_setter(
+    @odd.validate_on_set(
         types=bool,
-        call_func=True
+        call_wrapped=True,
         )
     def read_only(self, value):
         self._read_only = value
@@ -60,6 +68,11 @@ class Path(object):
     @property
     def df_backend(self):
         return self._config.df_backend
+
+
+    @property
+    def parts(self):
+        return self._to_parts(self.path)
 
 
     @property
@@ -91,7 +104,7 @@ class Path(object):
     @property
     def meta_data(self):
 
-        out = {
+        result = {
             'type': self.__class__.__name__,
             'hash_value': self.hash_value,
             'path': self.path,
@@ -104,29 +117,81 @@ class Path(object):
             'created_date',
             'modified_date',
             ]:
-            out[k] = (
+            result[k] = (
                 getattr(self, k).to_datetime()
-                if out['exists']
+                if result['exists']
                 else None
                 )
 
-        return out
+        return result
+
+
+    #╭-------------------------------------------------------------------------╮
+    #| Static Methods                                                          |
+    #╰-------------------------------------------------------------------------╯
+
+    @staticmethod
+    def _to_parts(path):
+        return [part for part in path.split('/') if part]
 
 
     #╭-------------------------------------------------------------------------╮
     #| Instance Methods                                                        |
     #╰-------------------------------------------------------------------------╯
 
-    def _on_read_only_toggle(self):
-        pass
+    def clone(self):
+        ''' create a copy of the file object '''
+        return deepcopy(self)
+
+
+    def with_prefix(self, prefix):
+        ''' adds a prefix the file name '''
+        (
+        odd.Validator(
+            types=str,
+            allow_blank=False,
+            )
+        .validate(
+            prefix=prefix
+            )
+        )
+
+        return self.with_name(f'{prefix}{self.name}')
+
+
+    def with_suffix(self, suffix):
+        ''' add suffix to file name '''
+        (
+        odd.Validator(
+            types=str,
+            allow_blank=False,
+            )
+        .validate(
+            suffix=suffix
+            )
+        )
+
+        return self.with_name(f'{self.name}{suffix}')
+
+
+    def with_read_only(self):
+        path = self.clone()
+        path.read_only = True
+        return path
+
+
+    def with_writable(self):
+        path = self.clone()
+        path.read_only = False
+        return path
 
 
     #╭-------------------------------------------------------------------------╮
     #| Magic Methods                                                           |
     #╰-------------------------------------------------------------------------╯
 
-    def __repr__(self):
-        return self.path.replace('/','\\')
+    def __hash__(self):
+        return hash(self.path)
 
 
     def __str__(self):

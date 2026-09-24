@@ -4,7 +4,7 @@ import zipfile as zf
 
 from ..base import File
 from ..._folder import Folder
-from ...decorators import check_read_only
+from ...decorators import assert_writable
 from ...utils import is_file, is_folder
 
 
@@ -26,7 +26,7 @@ class ZipFile(File):
         self.zip(*args, **kwargs)
 
 
-    @check_read_only
+    @assert_writable
     def zip(
         self,
         paths,
@@ -138,19 +138,19 @@ class ZipFile(File):
                 )
 
 
-        def write_file(file, hierarchy):
+        def write_file(file, parts):
             if filter_func and not filter_func(file):
                 return False
 
             if files_only:
-                arcname = file.name_ext
+                arcname = file.name_with_ext
             else:
                 if not include_folders:
-                    hierarchy = hierarchy[1:]
+                    parts = parts[1:]
 
                 arcname = '/'.join([
-                    *hierarchy,
-                    file.name_ext
+                    *parts,
+                    file.name_with_ext
                     ])
 
             zip_file.write(
@@ -169,7 +169,7 @@ class ZipFile(File):
 
         if self.ext != 'zip':
             raise Exception(
-                f'File is not a zip file: {self.name_ext!r}'
+                f'Expected .zip file extension: {self.name_with_ext!r}'
                 )
 
         if include_folders and files_only:
@@ -199,14 +199,14 @@ class ZipFile(File):
                 folder_deletable = True
 
                 for file in obj.walk():
-                    hierarchy = (
+                    parts = (
                         file
-                        .directory[:-1]
+                        .folder.path[:-1]
                         .replace(obj.parent.path, '')
                         .split('/')
                         )
 
-                    zipped = write_file(file, hierarchy)
+                    zipped = write_file(file, parts)
 
                     if not zipped:
                         folder_deletable = False
@@ -215,19 +215,19 @@ class ZipFile(File):
                     shutil.rmtree(obj.path)
 
 
-    @check_read_only
+    @assert_writable
     def unzip(self, folder=None, delete_source=False):
         ''' unzips file '''
 
         folder = (
-            self.directory
+            self.folder.path
             if folder is None
             else str(folder)
             )
 
         zip_file = zf.ZipFile(
             file=self.path,
-            mode='r'
+            mode='r',
             )
 
         with zip_file as z:

@@ -8,7 +8,7 @@ from ...path import Path
 from ...exceptions import ReadOnlyError
 
 from ...decorators import (
-    check_read_only,
+    assert_writable,
     inject_read_only,
     )
 
@@ -41,16 +41,12 @@ class Folder(Path):
         a new file object is initialized.
     sorter : callable
         Function used to sort folder and file objects.
-    troubleshoot : bool
-        If True, some information useful in troubleshooting is printed.
 
     Instance Attributes
     --------------------
     _path : str
-        Folder's path.
-    _subfolder_cache : dict
-        Cache of subfolders accessed by referencing attributes that do not
-        exist. See __getattr__ documentation for more information.
+        Folder's path. Defaults to the return value of get_cwd() if not
+        provided.
     '''
 
     #╭-------------------------------------------------------------------------╮
@@ -58,7 +54,6 @@ class Folder(Path):
     #╰-------------------------------------------------------------------------╯
 
     sorter = odd.natural_sort
-    troubleshoot = False
 
 
     #╭-------------------------------------------------------------------------╮
@@ -66,20 +61,10 @@ class Folder(Path):
     #╰-------------------------------------------------------------------------╯
 
     def __init__(self, path=None, read_only=True):
-        '''
-        Parameters
-        ------------
-        path : str | Folder
-            Folder path. if None, path will be the current working directory.
-            See 'get_cwd()' documentation for more information.
-        '''
-
         if path is None:
             path = get_cwd()
 
         self._path = trifurcate(path)[0]
-        self._subfolder_cache = {}
-
         super().__init__(read_only=read_only)
 
 
@@ -113,16 +98,9 @@ class Folder(Path):
 
 
     @property
-    def hierarchy(self):
-        ''' returns list representing tree hierarchy
-            (e.g. 'C:/Python/Projects/' → ['C:','Python','Projects']) '''
-        return list(filter(lambda x: x != '', self.path.split('/')))
-
-
-    @property
     def name(self):
         ''' name of folder '''
-        return self.hierarchy[-1]
+        return self.parts[-1]
 
 
     @property
@@ -133,29 +111,22 @@ class Folder(Path):
 
     @property
     def parent(self):
-        ''' parent directory '''
-        hierarchy = self.hierarchy
-
-        if len(hierarchy) == 1:
-            raise ValueError(
-                f'Folder does not have a parent directory:\n{self}'
-                )
-
-        return self.spawn('/'.join(hierarchy[:-1]) + '/')
+        ''' parent folder '''
+        return self._get_parent(read_only=self.read_only)
 
 
     @property
-    def cache_key(self):
-        return self._to_cache_key(self.name)
+    def depth(self):
+        return len(self.parts)
 
 
     @property
     def meta_data(self):
-        out = super().meta_data.copy()
+        result = super().meta_data.copy()
 
-        out.update({
+        result.update({
             'label': 'folder',
-            'directory': self.parent.path,
+            'folder': self.parent.path,
             'full_name': self.name.join(['/'] * 2),
             'empty': self.empty,
             })
@@ -165,9 +136,9 @@ class Folder(Path):
             'folder_count'
             ]:
             attr = k.split('_')[0] + 's'
-            out[k] = len(getattr(self, attr))
+            result[k] = len(getattr(self, attr))
 
-        return out
+        return result
 
 
     #╭-------------------------------------------------------------------------╮
@@ -210,62 +181,6 @@ class Folder(Path):
         return self.contents[key]
 
 
-    def __getattr__(self, name):
-        '''
-        Description
-        ------------
-        Called when an attribute is referenced that does not exist.
-        This implementation treats every non-existing attribute as a reference
-        to a subfolder that may or may not exist. Because attributes can be
-        formatted differently than their extant folder counterparts
-        (e.g. self.my_folder → 'MY FOLDER/') we first need to iterate through
-        the folder's current subfolder names to see if the attribute is a
-        referencing a folder that already exists. After this step, if no
-        matching extant folder was found and read_only is False, the referenced
-        folder will be created automatically.
-
-        Parameters
-        ------------
-        name : str
-            subfolder name
-
-        Returns
-        ------------
-        folder : Folder
-            Folder object
-        '''
-
-        if self.troubleshoot:
-            print(f'__getattr__(name={name!r}')
-
-        key = self._to_cache_key(name)
-
-        # check if the subfolder being referenced was already cached
-        if key in self._subfolder_cache:
-            if self.troubleshoot:
-                print(f'found key = {key!r} in cache')
-            return self._subfolder_cache[key]
-
-        # check if the subfolder being referenced already exists
-        for folder in self.folders:
-            if key == folder.cache_key:
-                if self.troubleshoot:
-                    print(f'found existing subfolder = {folder.name}')
-                self._subfolder_cache[key] = folder
-                return self._subfolder_cache[key]
-
-        # cache subfolder that does not exist yet
-        # (it will exist now if read_only=False)
-        if self.troubleshoot:
-            print('could not find subfolder = {name!r}')
-
-        self._subfolder_cache[key] = self.join(
-            name.replace('_', ' ').title()
-            )
-
-        return self._subfolder_cache[key]
-
-
     #╭-------------------------------------------------------------------------╮
     #| Instance Methods                                                        |
     #╰-------------------------------------------------------------------------╯
@@ -280,7 +195,15 @@ class Folder(Path):
         return self._spawn_file(*args, **kwargs)
 
 
-    def join(self, *args, **kwargs):
+    def join_folder(self, *args, **kwargs):
+        return self.join(*args, require='folder', **kwargs)
+
+
+    def join_file(self, *args, **kwargs):
+        return self.join(*args, require='file', **kwargs)
+
+
+    def join(self, *args, require='either', expected_descent=None, **kwargs):
         '''
         Description
         --------------------
@@ -340,30 +263,97 @@ class Folder(Path):
 
         Returns
         ----------
-        out : object
+        result : object
             folder or file object
         '''
+
+        def raise_requirement_error():
+            raise ValueError(
+                f'join() arguments must resolve to a {require} path when '
+                f'require={require!r}, got: {path!r}'
+                )
+
+
         self._validate_join_args(args)
 
-        path = trifurcate_and_join(self.path + '/'.join(args))
+        # validate require
+        (
+        odd.Validator(
+            types=str,
+            whitelist=['either','folder','file'],
+            )
+        .validate(
+            require=require
+            )
+        )
 
-        if is_file(path):
+        # validate max_descent
+        (
+        odd.Validator(
+            types=int,
+            allow_none=True,
+            min_value=0,
+            min_inclusive=True,
+            )
+        .validate(
+            expected_descent=expected_descent
+            )
+        )
+
+        path = trifurcate_and_join(self.path + '/'.join(args))
+        descent = len(self._to_parts(path)) - self.depth
+
+        (
+        odd.Validator(
+            types=int,
+            min_value=1,
+            min_inclusive=True,
+            )
+        .validate(
+            descent=descent
+            )
+        )
+
+        path_is_file = is_file(path)
+
+        if path_is_file:
+            descent -= 1
+
+        if expected_descent is not None and descent != expected_descent:
+            raise ValueError(
+                f'Join argument(s) resolve to a path {descent:,} level(s) '
+                f'beneath the current path but expected {expected_descent:,}.'
+                )
+
+        if path_is_file:
+
+            if require == 'folder':
+                raise_requirement_error()
+
             if not self.read_only:
                 # creates the folder(s) in the file path if they do not
                 # already exist
-                self.join(*path.replace(self.path, '').split('/')[:-1])
+                parts = path.replace(self.path, '').split('/')[:-1]
+
+                if parts:
+                    self.join_folder(*parts)
+
             return self.spawn_file(path, **kwargs)
 
         elif is_folder(path):
+
+            if require == 'file':
+                raise_requirement_error()
+
             return self.spawn(path, **kwargs)
 
         else:
-            raise TypeError(
+            raise AssertionError(
                 f'Join result is neither file nor folder: {path!r}'
                 )
 
 
-    @check_read_only
+    @assert_writable
     def create(self):
         ''' Creates the folder if it does not already exist. Missing parents
             in the hierarchy are created as well because accessing self.parent
@@ -373,14 +363,13 @@ class Folder(Path):
             create_folder(self.path)
 
 
-    @check_read_only
+    @assert_writable
     def delete(self):
         ''' delete the instance folder '''
         delete_folder(self.path)
-        self._clear_subfolder_cache()
 
 
-    @check_read_only
+    @assert_writable
     def clear(self):
         ''' deletes folder to clear it and then immediately recreates it '''
         self.delete()
@@ -410,20 +399,20 @@ class Folder(Path):
                 yield self.spawn_file(path)
 
 
-    def _to_cache_key(self, key):
-        cache_key = '_'.join(
-            key
-            .replace('/', '')
-            .replace('\\','')
-            .lower()
-            .split()
+    def with_name(self, name):
+        return self.parent.join_folder(name, expected_descent=1)
+
+
+    def _get_parent(self, read_only):
+        parts = self.parts[:-1]
+
+        if parts:
+            path = '/'.join([*parts, ''])
+            return self.spawn(path, read_only=read_only)
+
+        raise ValueError(
+            f'Folder does not have a parent folder: {self}'
             )
-
-        return cache_key
-
-
-    def _clear_subfolder_cache(self):
-        self._subfolder_cache.clear()
 
 
     def _on_read_only_toggle(self):
@@ -441,52 +430,51 @@ class Folder(Path):
         ''' verify join args are valid '''
 
         period_rules = (
-            'However, arguments may begin with '
-            'or contain a single period.'
+            'However, arguments may begin with or contain a single period.'
+            )
+
+        vd = odd.Validator(
+            types=str,
+            allow_blank=False,
             )
 
         for index, arg in enumerate(args):
             err_msg = f'Invalid join argument detected at index {index}:'
 
-            odd.validate_value(
-                value=arg,
-                name=err_msg,
-                types=str,
-                empty_ok=False,
-                )
+            vd.validate(arg, err_msg)
 
             if arg == '.':
                 raise ValueError(
-                    f"{err_msg} Single period arguments ('.') "
-                    f"are not allowed. {period_rules}"
+                    f"{err_msg} Single period arguments ('.') are not "
+                    f"allowed. {period_rules}"
                     )
 
             if arg.strip() == '':
                 raise ValueError(
-                    f"{err_msg} Empty or whitespace-only "
-                    "arguments are not allowed."
+                    f"{err_msg} Empty or whitespace-only arguments are not "
+                    "allowed."
                     )
 
             if '..' in arg:
                 raise ValueError(
-                    f"{err_msg} Consecutive periods are "
-                    f"not allowed. {period_rules}"
+                    f"{err_msg} Consecutive periods are not allowed. "
+                    f"{period_rules}"
                     )
 
             if arg[-1] == '.':
                 raise ValueError(
-                    f"{err_msg} Arguments may not end in "
-                    f"with a period ('.'). {period_rules}"
+                    f"{err_msg} Arguments may not end in with a period "
+                    f"('.'). {period_rules}"
                     )
 
             if arg != arg.strip():
                 raise ValueError(
-                    f'{err_msg} Argument ({arg!r}) contains '
-                    'leading or trailing whitespace.'
+                    f'{err_msg} Argument ({arg!r}) contains leading or '
+                    'trailing whitespace.'
                     )
 
             if any(x in arg for x in [':','*','?','"','<','>']):
                 raise ValueError(
-                    f'{err_msg} Argument ({arg!r}) '
-                    'contains a reserved character.'
+                    f'{err_msg} Argument ({arg!r}) contains a reserved '
+                    'character.'
                     )

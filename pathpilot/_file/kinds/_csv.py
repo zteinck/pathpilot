@@ -5,7 +5,7 @@ import polars as pl
 
 from ...decorators import (
     assert_exists,
-    check_read_only,
+    assert_writable,
     )
 
 from ..base import DfDispatchFile
@@ -30,7 +30,7 @@ class CsvFile(DfDispatchFile):
         return pl.scan_csv(self.path, **kwargs)
 
 
-    @check_read_only
+    @assert_writable
     def sink(self, lf, **kwargs):
         lf.sink_csv(self.path, **kwargs)
 

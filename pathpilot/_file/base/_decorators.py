@@ -72,29 +72,6 @@ def move_file(func):
     return wrapper
 
 
-def add_affix(func):
-
-    @wraps(func)
-    def wrapper(self, text, delimiter=' ', encase=False):
-        '''
-        Parameters
-        ------------
-        text : str
-            text to affix at the beginning or end of the file name
-        delimiter : str
-            character(s) separating the file name and affix
-        encase : bool
-            if True, the affix is encased in parenthesis
-        '''
-        kind = func.__name__.split('_')[-1]
-        if encase: text = f'({text})'
-        parts = [text, self.name]
-        if kind == 'suffix': parts.reverse()
-        return self.swap(name=delimiter.join(parts))
-
-    return wrapper
-
-
 def inject_df_backend(func):
 
     @wraps(func)

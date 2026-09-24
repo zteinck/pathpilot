@@ -1,5 +1,4 @@
 import os
-import datetime
 from functools import wraps
 
 import clockwork as cw
@@ -87,14 +86,7 @@ def _to_timestamp(func):
     def wrapper(path):
         letter = func.__name__.split('_')[1][0]
         ts = getattr(os.path, f'get{letter}time')(path)
-
-        # Conversion to datetime is redundant since cw.Timestamp
-        # constructor accepts timestamps, but explicitly using
-        # datetime library ensures time zone information is
-        # respected in case constructor behavior ever changes.
-        dt = datetime.datetime.fromtimestamp(ts)
-
-        return cw.Timestamp(dt)
+        return cw.Timestamp(ts)
 
     return wrapper
 

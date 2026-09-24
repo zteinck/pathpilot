@@ -31,8 +31,8 @@ class PickleFile(File):
     #╰-------------------------------------------------------------------------╯
 
     def read(self):
-        out = pd.read_pickle(self.path)
-        return self._squeeze(out)
+        result = pd.read_pickle(self.path)
+        return self._squeeze(result)
 
 
     def _save(self, args, **kwargs):

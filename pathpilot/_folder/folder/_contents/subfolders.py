@@ -28,4 +28,3 @@ class Subfolders(FolderContents):
     def delete(self):
         for folder in self:
             folder.delete()
-        self.folder._clear_subfolder_cache()

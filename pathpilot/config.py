@@ -1,6 +1,6 @@
 from oddments import (
     ReprMixin,
-    validate_setter,
+    validate_on_set,
     )
 
 from ._utils import _validate_df_backend
@@ -27,7 +27,7 @@ class PathpilotConfig(ReprMixin):
 
 
     @verbose.setter
-    @validate_setter(types=bool)
+    @validate_on_set(types=bool)
     def verbose():
         pass
 

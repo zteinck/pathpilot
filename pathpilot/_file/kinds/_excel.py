@@ -77,10 +77,10 @@ class ExcelFile(DfDispatchFile):
         **kwargs
         ):
         super().__init__(path, **kwargs)
-        self.format_cache = {}
-        self.sheet_cache = {}
-        self.number_tabs = number_tabs
-        self.page = 0
+        self._format_cache = {}
+        self._sheet_cache = {}
+        self._number_tabs = number_tabs
+        self._page = 0
 
 
     #╭-------------------------------------------------------------------------╮
@@ -102,7 +102,7 @@ class ExcelFile(DfDispatchFile):
 
         Returns
         ------------
-        out : any
+        result : any
             xlsxwriter.worksheet.Worksheet attribute
         '''
         return getattr(self.active_sheet, name)
@@ -122,15 +122,17 @@ class ExcelFile(DfDispatchFile):
 
         Returns
         ------------
-        out : xlsxwriter.worksheet.Worksheet | list
+        result : xlsxwriter.worksheet.Worksheet | list
              one or more worksheet objects
         '''
-
-        odd.validate_value(
-            value=key,
-            name='key',
+        (
+        odd.Validator(
             types=(int, slice, str)
             )
+        .validate(
+            key=key
+            )
+        )
 
         if isinstance(key, (int, slice)):
             return self.sheets[key]
@@ -155,12 +157,12 @@ class ExcelFile(DfDispatchFile):
     #| Classes                                                                 |
     #╰-------------------------------------------------------------------------╯
 
-    class WriteTimer(object):
+    class WriteTimer:
 
         def __init__(self, parent):
             self._parent = parent
             self._reset()
-            print(parent.name_ext + ':')
+            print(parent.name_with_ext + ':')
 
 
         @property
@@ -280,8 +282,8 @@ class ExcelFile(DfDispatchFile):
 
         Returns
         ------------
-        out : tuple
-            zero-based numbering row and column index (e.g. (0, 0)).
+        result : tuple
+            Zero-based numbering row and column index (e.g. (0, 0)).
         '''
 
         if isinstance(start_cell, (tuple, list)):
@@ -439,6 +441,26 @@ class ExcelFile(DfDispatchFile):
     #╰-------------------------------------------------------------------------╯
 
     @property
+    def format_cache(self):
+        return self._format_cache.copy()
+
+
+    @property
+    def sheet_cache(self):
+        return self._sheet_cache.copy()
+
+
+    @property
+    def number_tabs(self):
+        return self._number_tabs
+
+
+    @property
+    def page(self):
+        return self._page
+
+
+    @property
     def workbook(self):
         return self.writer.book
 
@@ -473,10 +495,10 @@ class ExcelFile(DfDispatchFile):
 
 
     @active_sheet.setter
-    @odd.validate_setter(
+    @odd.validate_on_set(
         types=str,
-        empty_ok=False,
-        call_func=True,
+        allow_blank=False,
+        call_wrapped=True,
         )
     def active_sheet(self, value):
         if value in self.sheet_cache:
@@ -489,6 +511,14 @@ class ExcelFile(DfDispatchFile):
     #| Instance Methods                                                        |
     #╰-------------------------------------------------------------------------╯
 
+    def clone(self):
+        return type(self)(
+            path=self.path,
+            read_only=self.read_only,
+            number_tabs=self.number_tabs,
+            )
+
+
     def create_worksheet(self, name):
         ''' create a new worksheet and set it as the active worksheet '''
 
@@ -500,7 +530,7 @@ class ExcelFile(DfDispatchFile):
                 )
 
         if self.number_tabs:
-            self.page += 1
+            self._page += 1
             name = f'{self.page} - {name}'
 
         # Excel has a 31 character limit
@@ -793,12 +823,15 @@ class ExcelFile(DfDispatchFile):
 
         df = odd.to_pandas_frame(df)
 
-        odd.validate_value(
-            value=date_format,
-            name='date_format',
+        (
+        odd.Validator(
             types=(str, dict),
-            none_ok=True
+            allow_none=True,
             )
+        .validate(
+            date_format=date_format
+            )
+        )
 
         # kwargs housekeeping
         if kwargs.get('inverse'):
@@ -921,10 +954,11 @@ class ExcelFile(DfDispatchFile):
 
             if isinstance(date_format, dict):
                 date_formats = {}
+                vd = odd.Validator(types=str)
                 for k in datelike_columns:
                     v = date_format.get(k)
                     if v is not None:
-                        odd.validate_value(value=v, types=str)
+                        vd.validate(v)
                         date_formats[k] = v
             else:
                 date_formats = {k: date_format for k in datelike_columns}
@@ -1255,7 +1289,7 @@ class ExcelFile(DfDispatchFile):
 
         Returns
         ------------
-        out : str
+        result : str
             Name of format (in other words, the self.formats dictionary key
             value)
         '''
@@ -1265,10 +1299,7 @@ class ExcelFile(DfDispatchFile):
                     return name
                 name = name.split('_')
 
-            odd.validate_value(
-                value=name,
-                types=(tuple, list)
-                )
+            odd.Validator(types=(tuple, list)).validate(name=name)
 
             fmt = dict()
             for k in name:
@@ -1311,7 +1342,7 @@ class ExcelFile(DfDispatchFile):
 
         Returns
         ------------
-        out : xlsxwriter.format.Format | None
+        result : xlsxwriter.format.Format | None
             format object
         '''
         if not arg:
@@ -1481,7 +1512,7 @@ class ExcelFile(DfDispatchFile):
 
         def get_column_formats():
             ''' build default 'column_formats' argument '''
-            out = {}
+            result = {}
             comma_style = '#,##0'
 
             for col, dtype in df.schema.items():
@@ -1496,9 +1527,9 @@ class ExcelFile(DfDispatchFile):
                 if '%' in col or 'percent' in col.lower():
                     col_fmt += '%'
 
-                out[col] = col_fmt
+                result[col] = col_fmt
 
-            return out
+            return result
 
         # apply default parameters
         defaults = {

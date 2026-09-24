@@ -3,12 +3,14 @@ from functools import wraps
 from .exceptions import ReadOnlyError
 
 
-def check_read_only(func):
+def assert_writable(func):
 
     @wraps(func)
     def wrapper(self, *args, **kwargs):
         if self.read_only:
-            raise ReadOnlyError
+            raise ReadOnlyError(
+                f'{func.__name__}() cannot be called in read-only mode.'
+                )
         return func(self, *args, **kwargs)
 
     return wrapper
