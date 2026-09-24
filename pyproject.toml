@@ -1,6 +1,6 @@
 [project]
 name = "pathpilot"
-version = "0.7.0"
+version = "0.7.1"
 description = "Simplifies file and folder manipulation"
 authors = [
     { name = "Zachary Einck", email = "zacharyeinck@gmail.com" }
