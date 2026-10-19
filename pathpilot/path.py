@@ -82,8 +82,8 @@ class Path(odd.ReprMixin):
 
 
     @property
-    def hash_value(self):
-        ''' sha256 hash value of path '''
+    def path_hash(self):
+        ''' SHA-256 hash of the path '''
         return sha256(self.path)
 
 
@@ -106,7 +106,7 @@ class Path(odd.ReprMixin):
 
         result = {
             'type': self.__class__.__name__,
-            'hash_value': self.hash_value,
+            'path_hash': self.path_hash,
             'path': self.path,
             'name': self.name,
             'read_only': self.read_only,

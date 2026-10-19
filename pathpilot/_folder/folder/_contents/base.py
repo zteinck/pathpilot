@@ -43,7 +43,7 @@ class FolderContents:
         schema = {
             'label': pl.Categorical,
             'type': pl.Categorical,
-            'hash_value': pl.String,
+            'path_hash': pl.String,
             'path': pl.String,
             'folder': pl.String,
             'full_name': pl.String,
@@ -107,7 +107,7 @@ class FolderContents:
     def to_dict(self):
         ''' dictionary where keys are object hash values and values are
             the objects themselves '''
-        return {obj.hash_value: obj for obj in self}
+        return {obj.path_hash: obj for obj in self}
 
 
     def delete(self):
@@ -353,8 +353,8 @@ class FolderContents:
             return df
 
         try:
-            hash_value = df['hash_value'][index]
-            return self.to_dict()[hash_value]
+            path_hash = df['path_hash'][index]
+            return self.to_dict()[path_hash]
         except Exception as error:
             if errors == 'ignore':
                 return None

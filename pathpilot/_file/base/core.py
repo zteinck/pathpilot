@@ -1,6 +1,7 @@
 import shutil
 import filecmp
 import os
+import hashlib
 
 import oddments as odd
 
@@ -176,6 +177,16 @@ class File(Path):
             })
 
         return result
+
+
+    @property
+    def content_hash(self):
+        ''' SHA-256 hash of the file contents '''
+
+        with open(self.path, mode='rb') as file_obj:
+            digest = hashlib.file_digest(file_obj, 'sha256').hexdigest()
+
+        return digest
 
 
     #╭-------------------------------------------------------------------------╮
